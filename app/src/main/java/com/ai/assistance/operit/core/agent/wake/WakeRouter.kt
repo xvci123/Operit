@@ -56,8 +56,16 @@ object WakeRouter {
         scope.launch {
             WakeInboxStore.ensureLoaded(appContext)
             AppLogger.i(TAG, "唤醒路由器已启动")
+            // 冷启动先让应用喘一口气：这时候 UI、Room、插件都还在初始化，
+            // 立刻把上次没派发完的唤醒踢起来容易和启动流程抢资源。
+            // 排队的事件不会丢——它们本来就落盘了，晚 15 秒照样派发。
+            var graceMs = 15_000L
             while (true) {
                 try {
+                    if (graceMs > 0L) {
+                        delay(graceMs)
+                        graceMs = 0L
+                    }
                     tick(appContext)
                 } catch (e: Exception) {
                     AppLogger.e(TAG, "唤醒调度出错（已吞掉，不影响主流程）", e)

@@ -646,7 +646,7 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "spawn_subagent",
-                            description = "Spawn a subagent in a separate chat to handle a self-contained task, then return its final result. The subagent cannot see your conversation. Use it for long or parallel work.",
+                            description = "Spawn a subagent in a separate chat to handle a self-contained task, then return its final result. The subagent cannot see your conversation, and you receive its conclusion only — not its tool output or reasoning. On failure the result names the failure class (timeout / empty reply / busy / error) and includes whatever partial output it produced. Use it for long or parallel work.",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "task", type = "string", description = "required, self-contained task description", required = true),
                                 ToolParameterSchema(name = "description", type = "string", description = "optional, short label for the subagent", required = false),
@@ -3701,7 +3701,7 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "spawn_subagent",
-                            description = "派一个子智能体在独立会话里处理一件自包含的任务，并把它最终的结果带回来。子智能体看不到你的对话。适合耗时较长或可以并行的工作。",
+                            description = "派一个子智能体在独立会话里处理一件自包含的任务，并把它最终的结果带回来。子智能体看不到你的对话，你也只拿到它的最终结论（拿不到它的工具输出和思考过程）。失败时结果会写明失败类型（超时 / 空回复 / 子会话忙 / 报错）并附上它已经产出的部分。适合耗时较长或可以并行的工作。",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "task", type = "string", description = "必填，自包含的任务描述", required = true),
                                 ToolParameterSchema(name = "description", type = "string", description = "可选，给子智能体的短标签", required = false),
