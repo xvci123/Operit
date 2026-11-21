@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.core.agent.jobs
 
 import android.content.Context
+import com.ai.assistance.operit.core.agent.wake.WakeEvent
+import com.ai.assistance.operit.core.agent.wake.WakeRouter
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.core.tools.system.shell.ShellProcess
 import com.ai.assistance.operit.util.AppLogger
@@ -87,7 +89,11 @@ object JobManager {
             val startedAt: Long,
             var endedAt: Long? = null,
             var exitCode: Int? = null,
-            var note: String = ""
+            var note: String = "",
+            /** 发起这个作业的会话。结算时要把唤醒投回这里；null 表示不叫醒任何人。 */
+            val ownerChatId: String? = null,
+            /** 结果已经被直接取走过（job_output 拿到了终态），结束后不再唤醒。 */
+            var awaited: Boolean = false
     ) {
         fun toJson(): JSONObject =
                 JSONObject().apply {
@@ -99,6 +105,8 @@ object JobManager {
                     put("endedAt", endedAt ?: JSONObject.NULL)
                     put("exitCode", exitCode ?: JSONObject.NULL)
                     put("note", note)
+                    put("ownerChatId", ownerChatId ?: JSONObject.NULL)
+                    put("awaited", awaited)
                 }
 
         companion object {
@@ -116,7 +124,11 @@ object JobManager {
                             startedAt = obj.optLong("startedAt"),
                             endedAt = if (obj.isNull("endedAt")) null else obj.getLong("endedAt"),
                             exitCode = if (obj.isNull("exitCode")) null else obj.getInt("exitCode"),
-                            note = obj.optString("note")
+                            note = obj.optString("note"),
+                            ownerChatId =
+                                    if (obj.isNull("ownerChatId")) null
+                                    else obj.optString("ownerChatId").takeIf { it.isNotBlank() },
+                            awaited = obj.optBoolean("awaited", false)
                     )
         }
     }
@@ -287,7 +299,12 @@ object JobManager {
      *
      * @return 已写入索引的记录
      */
-    fun start(context: Context, command: String, title: String?): JobRecord {
+    fun start(
+            context: Context,
+            command: String,
+            title: String?,
+            ownerChatId: String? = null
+    ): JobRecord {
         ensureLoaded(context)
         val appContext = context.applicationContext
         val record =
@@ -296,7 +313,9 @@ object JobManager {
                         title = title?.trim()?.takeIf { it.isNotEmpty() } ?: defaultTitle(command),
                         command = command,
                         status = JobStatus.RUNNING,
-                        startedAt = System.currentTimeMillis()
+                        startedAt = System.currentTimeMillis(),
+                        // 工具层拿不到会话 id，靠 TurnContext 记录"最近真正开跑的会话"
+                        ownerChatId = ownerChatId
                 )
         val live = LiveJob(appContext, record, OutputBuffer())
         synchronized(lock) { records[record.id] = record }
@@ -348,7 +367,46 @@ object JobManager {
             }
             flushLog(live)
             persistIndex(live.context)
+            maybeWakeOwner(live)
             live.finished.complete(Unit)
+        }
+    }
+
+    /**
+     * 作业结束 → 给发起它的会话投一条唤醒。
+     *
+     * 三种情况不叫醒：被 job_kill 终止（人已经不想要结果了）、没有 owner、
+     * 结果已经被 job_output 直接收走（awaited 位，抄 DSHA 的规则，免得同一次结算既读又唤醒）。
+     */
+    private fun maybeWakeOwner(live: LiveJob) {
+        val record = live.record
+        try {
+            if (record.status == JobStatus.KILLED) return
+            if (record.awaited) {
+                AppLogger.d(TAG, "作业结果已被直接取走，不再唤醒：${record.id}")
+                return
+            }
+            val owner = record.ownerChatId
+            if (owner.isNullOrBlank()) {
+                AppLogger.d(TAG, "作业没有 owner，不唤醒：${record.id}")
+                return
+            }
+            val elapsed =
+                    formatDuration((record.endedAt ?: System.currentTimeMillis()) - record.startedAt)
+            val event =
+                    WakeEvent.forJobSettled(
+                            jobId = record.id,
+                            ownerChatId = owner,
+                            title = record.title,
+                            command = record.command,
+                            statusText = statusLabel(record),
+                            elapsedText = elapsed,
+                            note = record.note
+                    )
+            WakeRouter.submit(live.context, event)
+        } catch (e: Exception) {
+            // 唤醒失败不能影响作业本身记账
+            AppLogger.w(TAG, "作业结算唤醒投递失败：${record.id}", e)
         }
     }
 
@@ -460,6 +518,16 @@ object JobManager {
         val endedAt = synchronized(lock) { record.endedAt }
         val exitCode = synchronized(lock) { record.exitCode }
         val note = synchronized(lock) { record.note }
+
+        // 结果已经被取到手了：把 awaited 位立起来，作业真结束时不再补一条唤醒。
+        // 同时把可能已经排队的那条唤醒作废（读和结算之间差几毫秒的情况）。
+        if (statusAtRead != JobStatus.RUNNING) {
+            if (!record.awaited) {
+                record.awaited = true
+                persistIndex(context)
+            }
+            WakeRouter.markConsumed(context, "job:" + record.id + ":settled")
+        }
 
         val body = currentBody(context, record)
         val total = body.length

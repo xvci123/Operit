@@ -19,6 +19,7 @@ import com.ai.assistance.operit.data.model.InputProcessingState
 import com.ai.assistance.operit.data.model.CharacterCardChatModelBindingMode
 import com.ai.assistance.operit.data.model.CharacterCardMemoryProfileBindingMode
 import com.ai.assistance.operit.data.model.ActivePrompt
+import com.ai.assistance.operit.core.agent.wake.WakeRouter
 import com.ai.assistance.operit.core.tools.ToolProgressBus
 import com.ai.assistance.operit.ui.features.chat.viewmodel.UiStateDelegate
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
@@ -331,6 +332,13 @@ class MessageCoordinationDelegate(
         turnOptions: ChatTurnOptions = ChatTurnOptions(),
         preferActiveRoleCard: Boolean = false,
     ) {
+        // Hermes：只有"用户从输入框发的真实消息"才清零内部自唤醒计数。
+        // 唤醒、自动化、作业结算全都带 messageTextOverride，走不到这个分支，
+        // 所以 AI 不会自己给自己清零、把连续唤醒计数刷掉。
+        if (messageTextOverride == null) {
+            WakeRouter.userBecameActive(context)
+        }
+
         // 仅在没有指定 chatId 的情况下，才需要确保有当前对话
         if (chatIdOverride.isNullOrBlank() && chatHistoryDelegate.currentChatId.value == null) {
             AppLogger.d(TAG, "当前没有活跃对话，自动创建新对话")

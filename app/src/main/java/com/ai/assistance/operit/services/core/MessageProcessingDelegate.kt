@@ -47,6 +47,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.ai.assistance.operit.core.agent.wake.TurnContext
 import com.ai.assistance.operit.core.tools.ToolProgressBus
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -758,6 +759,9 @@ class MessageProcessingDelegate(
             )
             return
         }
+        // Hermes：记下"最近真正开跑的会话"。后台作业/子代理结算时靠它把唤醒投回原会话；
+        // 工具层的 invoke(tool) 里没有会话上下文，只能在这里落一笔。
+        TurnContext.enter(chatId)
         val turnId = chatRuntime.turnSequence.incrementAndGet()
         chatRuntime.activeTurnId = turnId
 
@@ -1721,6 +1725,9 @@ class MessageProcessingDelegate(
         if (chatRuntime.isLoading.value) {
             throw IllegalStateException(context.getString(R.string.chat_regenerate_busy))
         }
+        // Hermes：记下"最近真正开跑的会话"。后台作业/子代理结算时靠它把唤醒投回原会话；
+        // 工具层的 invoke(tool) 里没有会话上下文，只能在这里落一笔。
+        TurnContext.enter(chatId)
         val turnId = chatRuntime.turnSequence.incrementAndGet()
         chatRuntime.activeTurnId = turnId
 

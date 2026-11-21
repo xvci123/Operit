@@ -20,6 +20,7 @@ import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.core.agent.wake.WakeRouter
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
@@ -231,6 +232,9 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
             CustomEmojiRepository.getInstance(applicationContext).initializeBuiltinEmojis()
             AppLogger.d(TAG, "【启动计时】当前角色自定义表情初始化完成（异步） - ${System.currentTimeMillis() - emojiStartTime}ms")
         }
+
+        // Hermes：唤醒收件箱。进程可能刚被系统杀过，这里把上次没派发完的唤醒事件接着排。
+        WakeRouter.init(applicationContext)
 
         // 初始化AndroidShellExecutor上下文
         AndroidShellExecutor.setContext(applicationContext)

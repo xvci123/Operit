@@ -2,6 +2,7 @@ package com.ai.assistance.operit.core.tools.jobs
 
 import android.content.Context
 import com.ai.assistance.operit.core.agent.jobs.JobManager
+import com.ai.assistance.operit.core.agent.wake.TurnContext
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
 import com.ai.assistance.operit.core.tools.system.shell.CommandSafety
@@ -43,7 +44,8 @@ class RunInBackgroundToolExecutor(private val context: Context) : ToolExecutor {
         val title = tool.parameters.find { it.name == "title" }?.value
 
         return try {
-            val record = JobManager.start(context, command, title)
+            // owner 取自"最近真正开跑的会话"：作业结束时唤醒要投回它。
+            val record = JobManager.start(context, command, title, TurnContext.current())
             val text =
                     buildString {
                         append("作业已启动：").append(record.id).append('\n')
