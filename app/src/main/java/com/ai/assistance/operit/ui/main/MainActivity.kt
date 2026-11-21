@@ -23,6 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -45,7 +46,7 @@ import com.ai.assistance.operit.data.updates.UpdateStatus
 import com.ai.assistance.operit.ui.common.NavItem
 import com.ai.assistance.operit.ui.features.agreement.screens.AgreementScreen
 import com.ai.assistance.operit.ui.features.permission.screens.PermissionGuideScreen
-import com.ai.assistance.operit.ui.features.startup.screens.PluginLoadingScreenWithState
+import com.ai.assistance.operit.ui.features.startup.screens.HermesPluginProgressBarWithState
 import com.ai.assistance.operit.ui.features.startup.screens.PluginLoadingState
 import com.ai.assistance.operit.ui.features.startup.screens.LocalPluginLoadingState
 import com.ai.assistance.operit.ui.features.startup.screens.PluginLoadingStateRegistry
@@ -696,9 +697,11 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     // 插件加载界面 (带有淡出效果) - 始终在最上层
-                    PluginLoadingScreenWithState(
+                    // Hermes（P6）：插件加载不再全屏遮挡，改成顶部一条进度条，
+                    // 聊天页立即可用；插件在后台继续初始化。
+                    HermesPluginProgressBarWithState(
                             loadingState = pluginLoadingState,
-                            modifier = Modifier.zIndex(10f) // 确保加载界面在最上层
+                            modifier = Modifier.zIndex(10f).align(Alignment.TopCenter)
                     )
 
                     // Hermes：冷启动动画。放在最后 → 盖在所有内容之上（包括插件加载页），

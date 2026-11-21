@@ -993,6 +993,40 @@ class PluginLoadingState {
     }
 }
 
+/**
+ * Hermes（P6）：插件加载的**不阻塞**形态。
+ *
+ * 原来的全屏加载页会把用户挡在外面最多 30 秒。产品决定是"先进聊天、插件后台加载"，
+ * 所以改成顶部一条细进度条：聊天页立即可用，插件在底下继续初始化。
+ *
+ * 刻意不显示插件明细：明细是开发期调试用的，正常用户不需要；
+ * 真要看日志，设置里还能查。
+ */
+@Composable
+fun HermesPluginProgressBarWithState(loadingState: PluginLoadingState, modifier: Modifier = Modifier) {
+    val isVisible by loadingState.isVisible.collectAsState()
+    val progress by loadingState.progress.collectAsState()
+
+    if (!isVisible) return
+
+    val clamped = progress.coerceIn(0f, 1f)
+    androidx.compose.foundation.layout.Column(modifier = modifier.fillMaxWidth()) {
+        androidx.compose.foundation.layout.Box(
+                modifier =
+                        Modifier.fillMaxWidth()
+                                .height(2.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            androidx.compose.foundation.layout.Box(
+                    modifier =
+                            Modifier.fillMaxWidth(clamped)
+                                    .height(2.dp)
+                                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+    }
+}
+
 /** 插件加载屏幕的预览视图 */
 @Composable
 fun PluginLoadingScreenWithState(loadingState: PluginLoadingState, modifier: Modifier = Modifier) {
