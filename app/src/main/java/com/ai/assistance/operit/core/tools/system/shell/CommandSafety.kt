@@ -10,7 +10,7 @@ package com.ai.assistance.operit.core.tools.system.shell
  * 一律放行。
  *
  * 硬限制清单：
- *  H1 写块设备      `> /dev/block/*`、`dd of=/dev/block/*`、`of=/dev/mmcblk*` 等
+ *  H1 写块设备      `> /dev/block/…`、`dd of=/dev/block/…`、`of=/dev/mmcblk…` 等
  *  H2 格式化/分区   `mkfs*`、`mke2fs`、`wipefs`、`fdisk`、`sgdisk`、`parted`
  *  H3 递归删系统根  `rm -r /`、`rm -r /system`、`find / -delete`
  *  H4 改分区挂载    `mount -o remount,rw /system`、`setenforce 0`

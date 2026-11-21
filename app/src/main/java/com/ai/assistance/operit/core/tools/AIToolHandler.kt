@@ -105,7 +105,7 @@ class AIToolHandler private constructor(private val context: Context) {
                 tool.parameters.firstOrNull { it.name == "command" }?.value
                         ?: tool.parameters.firstOrNull { it.name == "shell_command" }?.value
         CommandSafety.catastrophicReason(commandText)?.let { reason ->
-            return AIToolHookDecision.Block("Irreversible command blocked: $reason")
+            return AIToolHookDecision.Block("[策略拒绝] 该命令被判定为不可逆操作：$reason")
         }
 
         toolHooks.forEach { hook ->

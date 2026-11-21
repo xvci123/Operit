@@ -93,8 +93,8 @@ open class StandardShellToolExecutor(private val context: Context) {
                 ToolValidationResult(
                         valid = false,
                         errorMessage =
-                                "Irreversible command blocked: " +
-                                        (CommandSafety.catastrophicReason(command) ?: "unknown")
+                                "[策略拒绝] 该命令被判定为不可逆操作：" +
+                                        (CommandSafety.catastrophicReason(command) ?: "未知原因")
                 )
             }
             else -> {
