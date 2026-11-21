@@ -849,3 +849,25 @@ dependencies {
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
 }
+
+
+// ===== Hermes: strip the bundled offline speech model to shrink the APK =====
+val hermesStripAssetDirs = listOf("sherpa-ncnn-streaming-zipformer-bilingual-zh-en-2023-02-13")
+
+tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Assets")) {
+        doLast {
+            val root = layout.buildDirectory.dir("intermediates/assets").get().asFile
+            if (!root.isDirectory) {
+                println("### HERMES: assets intermediates not found, nothing stripped")
+                return@doLast
+            }
+            val hits = root.walkTopDown()
+                .filter { it.isFile && hermesStripAssetDirs.any { d -> it.path.contains(d) } }
+                .toList()
+            var freed = 0L
+            hits.forEach { freed += it.length(); it.delete() }
+            println("### HERMES: stripped ${hits.size} speech-model files, freed ${freed / 1048576} MB")
+        }
+    }
+}
