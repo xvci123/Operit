@@ -7,6 +7,9 @@ import com.ai.assistance.operit.core.tools.climode.CliToolModeSupport
 import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
 import com.ai.assistance.operit.core.tools.ask.AskUserToolExecutor
+import com.ai.assistance.operit.core.tools.jobs.JobKillToolExecutor
+import com.ai.assistance.operit.core.tools.jobs.JobOutputToolExecutor
+import com.ai.assistance.operit.core.tools.jobs.RunInBackgroundToolExecutor
 import com.ai.assistance.operit.core.tools.subagent.SpawnSubagentToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
@@ -1428,6 +1431,34 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 "Spawn subagent: $description"
             },
             executor = SpawnSubagentToolExecutor(context)
+    )
+
+    // Hermes: 后台作业（P1）——命令脱离对话轮次运行，输出有界落盘，可轮询 / 终止
+    handler.registerTool(
+            name = RunInBackgroundToolExecutor.TOOL_NAME,
+            descriptionGenerator = { tool ->
+                val command = tool.parameters.find { it.name == "command" }?.value ?: ""
+                "Run in background: $command"
+            },
+            executor = RunInBackgroundToolExecutor(context)
+    )
+
+    handler.registerTool(
+            name = JobOutputToolExecutor.TOOL_NAME,
+            descriptionGenerator = { tool ->
+                val jobId = tool.parameters.find { it.name == "job_id" }?.value ?: "(list)"
+                "Read job output: $jobId"
+            },
+            executor = JobOutputToolExecutor(context)
+    )
+
+    handler.registerTool(
+            name = JobKillToolExecutor.TOOL_NAME,
+            descriptionGenerator = { tool ->
+                val jobId = tool.parameters.find { it.name == "job_id" }?.value ?: ""
+                "Kill job: $jobId"
+            },
+            executor = JobKillToolExecutor(context)
     )
 
     // Intent工具

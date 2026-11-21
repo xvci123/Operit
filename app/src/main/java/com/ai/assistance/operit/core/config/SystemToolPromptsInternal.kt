@@ -656,6 +656,39 @@ object SystemToolPromptsInternal {
                     )
             ),
             SystemToolPromptCategory(
+                categoryName = "Background Jobs",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "run_in_background",
+                            description = "Start a shell command as a background job and return immediately with a job id. Use it for long-running commands so you can keep working. The command has NO timeout and runs until it exits or is killed with job_kill. The job dies with the app process and is never restarted automatically.",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "command", type = "string", description = "required, the shell command to run", required = true),
+                                ToolParameterSchema(name = "title", type = "string", description = "optional, short label for the job", required = false)
+                            )
+                        ),
+                        ToolPrompt(
+                            name = "job_output",
+                            description = "Read the output of a background job. Without wait=true it returns what is available right now. With wait=true it waits until the job finishes or timeout_ms elapses. Omit job_id to list all jobs. Output is bounded: the head and tail are kept, the middle is replaced by a marker.",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "job_id", type = "string", description = "optional, omit to list all jobs", required = false),
+                                ToolParameterSchema(name = "wait", type = "string", description = "optional, \"true\" to block until the job finishes", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, max wait in ms when wait=true, default 30000", required = false),
+                                ToolParameterSchema(name = "max_chars", type = "number", description = "optional, max characters returned, default 16000", required = false),
+                                ToolParameterSchema(name = "mode", type = "string", description = "optional, head | tail (default tail: keep the newest output)", required = false)
+                            )
+                        ),
+                        ToolPrompt(
+                            name = "job_kill",
+                            description = "Kill a running background job.",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "job_id", type = "string", description = "required, job id returned by run_in_background", required = true),
+                                ToolParameterSchema(name = "reason", type = "string", description = "optional, why it is being killed", required = false)
+                            )
+                        )
+                    )
+            ),
+            SystemToolPromptCategory(
                 categoryName = "Extended Memory Tools",
                 tools =
                     listOf(
@@ -3673,6 +3706,39 @@ object SystemToolPromptsInternal {
                                 ToolParameterSchema(name = "task", type = "string", description = "必填，自包含的任务描述", required = true),
                                 ToolParameterSchema(name = "description", type = "string", description = "可选，给子智能体的短标签", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 300000", required = false)
+                            )
+                        )
+                    )
+            ),
+            SystemToolPromptCategory(
+                categoryName = "后台作业",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "run_in_background",
+                            description = "把一条 shell 命令作为后台作业启动，立刻返回作业 id。耗时长的命令用这个，启动后可以继续做别的事。命令不限时，会一直跑到自己结束或被 job_kill 终止。作业随应用进程结束而中断，不会自动重跑。",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "command", type = "string", description = "必填，要执行的 shell 命令", required = true),
+                                ToolParameterSchema(name = "title", type = "string", description = "可选，作业的短标签", required = false)
+                            )
+                        ),
+                        ToolPrompt(
+                            name = "job_output",
+                            description = "读取后台作业的输出。不带 wait=true 时立刻返回当前已有的输出；带 wait=true 时会等到作业结束或 timeout_ms 用完。不传 job_id 则列出全部作业。输出有界：保留开头和结尾，中间用标记省略。",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "job_id", type = "string", description = "可选，不传则列出全部作业", required = false),
+                                ToolParameterSchema(name = "wait", type = "string", description = "可选，\"true\" 表示等到作业结束", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，wait=true 时最长等待毫秒数，默认 30000", required = false),
+                                ToolParameterSchema(name = "max_chars", type = "number", description = "可选，最多返回的字符数，默认 16000", required = false),
+                                ToolParameterSchema(name = "mode", type = "string", description = "可选，head | tail，默认 tail（保留最新输出）", required = false)
+                            )
+                        ),
+                        ToolPrompt(
+                            name = "job_kill",
+                            description = "终止一个正在运行的后台作业。",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "job_id", type = "string", description = "必填，run_in_background 返回的作业 id", required = true),
+                                ToolParameterSchema(name = "reason", type = "string", description = "可选，终止原因", required = false)
                             )
                         )
                     )

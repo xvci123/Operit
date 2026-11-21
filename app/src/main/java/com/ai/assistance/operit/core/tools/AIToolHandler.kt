@@ -191,6 +191,16 @@ class AIToolHandler private constructor(private val context: Context) {
             descriptionGenerator: ((AITool) -> String)? = null,
             executor: ToolExecutor
     ) {
+        // Hermes: 工具重名检测。原实现对同名工具直接覆盖（availableTools[name] = executor），
+        // 后注册者静默胜出，模型看到的名字不变、行为却换了，排查时毫无线索。
+        // 这里只在覆盖时记一条日志：不拦、不抛、不改行为——只让问题可见。
+        availableTools[name]?.let { existing ->
+            AppLogger.w(
+                    TAG,
+                    "[工具重名] '$name' 已被 ${existing.javaClass.name} 注册，现被 " +
+                            "${executor.javaClass.name} 覆盖（后注册者生效）"
+            )
+        }
         availableTools[name] = executor
 
         // 注册描述生成器（如果提供）
