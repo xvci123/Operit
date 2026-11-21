@@ -646,11 +646,12 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "spawn_subagent",
-                            description = "Spawn a subagent in a separate chat to handle a self-contained task, then return its final result. The subagent cannot see your conversation, and you receive its conclusion only — not its tool output or reasoning. On failure the result names the failure class (timeout / empty reply / busy / error) and includes whatever partial output it produced. Set fork=true to let it build on this conversation. Use it for long or parallel work.",
+                            description = "Spawn a subagent in a separate chat to handle a self-contained task, then return its final result. The subagent cannot see your conversation, and you receive its conclusion only — not its tool output or reasoning. On failure the result names the failure class (timeout / empty reply / busy / error) and includes whatever partial output it produced. Set fork=true to let it build on this conversation; set run_in_background=true so it reports back when it settles. Use it for long or parallel work.",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "task", type = "string", description = "required, self-contained task description", required = true),
                                 ToolParameterSchema(name = "description", type = "string", description = "optional, short label for the subagent", required = false),
                                 ToolParameterSchema(name = "fork", type = "string", description = "optional, true or false (default false). true seeds the child with this conversation's completed turns (not the in-flight turn), so the task can build on them; false starts with a clean history and the task must be self-contained", required = false),
+                                ToolParameterSchema(name = "run_in_background", type = "string", description = "optional, true or false (default false). true returns immediately with the subagent's chat id; when the subagent finishes, it wakes this conversation with the conclusion — do not poll or sleep waiting for it", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, default 300000", required = false)
                             )
                         )
@@ -3702,11 +3703,12 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "spawn_subagent",
-                            description = "派一个子智能体在独立会话里处理一件自包含的任务，并把它最终的结果带回来。子智能体看不到你的对话，你也只拿到它的最终结论（拿不到它的工具输出和思考过程）。失败时结果会写明失败类型（超时 / 空回复 / 子会话忙 / 报错）并附上它已经产出的部分。需要接着本会话的内容说就传 fork=true。适合耗时较长或可以并行的工作。",
+                            description = "派一个子智能体在独立会话里处理一件自包含的任务，并把它最终的结果带回来。子智能体看不到你的对话，你也只拿到它的最终结论（拿不到它的工具输出和思考过程）。失败时结果会写明失败类型（超时 / 空回复 / 子会话忙 / 报错）并附上它已经产出的部分。需要接着本会话的内容说就传 fork=true；要它干完自己回来报告就传 run_in_background=true。适合耗时较长或可以并行的工作。",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "task", type = "string", description = "必填，自包含的任务描述", required = true),
                                 ToolParameterSchema(name = "description", type = "string", description = "可选，给子智能体的短标签", required = false),
                                 ToolParameterSchema(name = "fork", type = "string", description = "可选，true 或 false（默认 false）。true 时把本会话**已完成的轮次**复制给子智能体（不含当前这一轮），任务可以接着上面的内容说；false 时子体零历史，任务必须自带全部上下文", required = false),
+                                ToolParameterSchema(name = "run_in_background", type = "string", description = "可选，true 或 false（默认 false）。true 时立刻返回子会话 id，子体干完会主动回到本会话叫醒你——不要轮询、不要 sleep 等", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 300000", required = false)
                             )
                         )

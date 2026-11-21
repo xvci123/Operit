@@ -2,6 +2,8 @@ package com.ai.assistance.operit.core.tools.subagent
 
 import android.content.Context
 import com.ai.assistance.operit.core.agent.wake.TurnContext
+import com.ai.assistance.operit.core.agent.wake.WakeEvent
+import com.ai.assistance.operit.core.agent.wake.WakeRouter
 import com.ai.assistance.operit.core.tools.MessageSendResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
@@ -11,6 +13,11 @@ import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
 import com.ai.assistance.operit.data.repository.ChatHistoryManager
+import com.ai.assistance.operit.util.AppLogger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -37,7 +44,12 @@ import kotlinx.coroutines.runBlocking
  */
 class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
 
+    /** 后台子体的协程作用域。故意不挂在任何一轮对话上：父轮结束它还得继续跑。 */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     companion object {
+        private const val TAG = "SpawnSubagent"
+
         const val TOOL_NAME = "spawn_subagent"
         const val DEFAULT_TIMEOUT_MS = 300_000L
         const val TITLE_PREFIX = "[子代理] "
@@ -73,7 +85,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
             return """
                 [回报要求]
                 你的父 agent 就是派你来干活的会话。完成之前，把结论整理成**自包含**的结果直接输出：
-                $header所以不要写"见上""如前所述"，历史里的东西也要在结论里点明是哪一段。
+                ${header}所以不要写"见上""如前所述"，历史里的东西也要在结论里点明是哪一段。
                 请给出：做了什么、结果是什么、有没有没做成的地方和原因。
                 [/回报要求]
                 """
@@ -96,6 +108,13 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
         val fork =
                 tool.parameters
                         .find { it.name == "fork" }
+                        ?.value
+                        ?.trim()
+                        ?.lowercase()
+                        .let { it == "true" || it == "1" || it == "yes" }
+        val background =
+                tool.parameters
+                        .find { it.name == "run_in_background" }
                         ?.value
                         ?.trim()
                         ?.lowercase()
@@ -166,6 +185,36 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
 
                 // 2. fork 时先把父会话已完成的轮次搬过去
                 val seedNote = if (fork) seedChildFromParent(chatId) else ""
+
+                // 3. 后台模式：立刻返回，跑完由唤醒路由回来找父会话
+                if (background) {
+                    val parentChatId = TurnContext.current()
+                    val childChatIdForJob = chatId
+                    val taskMessage = message
+                    scope.launch {
+                        runBackgroundSubagent(
+                                chatTools = chatTools,
+                                childChatId = childChatIdForJob,
+                                parentChatId = parentChatId,
+                                message = taskMessage,
+                                timeoutMs = timeoutMs,
+                                label = label
+                        )
+                    }
+                    return@runBlocking ToolResult(
+                            toolName = tool.name,
+                            success = true,
+                            result =
+                                    StringResultData(
+                                            renderBackgroundStarted(
+                                                    label = label,
+                                                    chatId = chatId,
+                                                    seedNote = seedNote,
+                                                    parentChatId = parentChatId
+                                            )
+                                    )
+                    )
+                }
 
                 // 3. 下发任务（带两段固定文字）
                 val sent =
@@ -239,6 +288,102 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
         }
     }
 
+    // ==================== 后台模式 ====================
+
+    /** 后台子体的结算内容：一句话结论 + 结束理由 + 收尾正文（DSHA 的 createSettlementMessage）。 */
+    private data class SubagentOutcome(
+            val succeeded: Boolean,
+            val reply: String,
+            val failureClass: String
+    )
+
+    /**
+     * 在后台把子体这一轮跑完，然后往父会话投一条唤醒。
+     *
+     * 为什么用唤醒而不是让父体轮询：父轮早就结束了，没有任何人在等这个结果；
+     * 轮询要把父体卡在工具调用里（旧办法），或者让父体反复来查（费钱又慢）。
+     *
+     * 进程被杀时这个协程会一起消失，父会话也就收不到唤醒——子会话里留下的是半个回合。
+     * 这和后台作业同一条约定：**随进程死亡，不重跑**。
+     */
+    private suspend fun runBackgroundSubagent(
+            chatTools: com.ai.assistance.operit.core.tools.defaultTool.standard.StandardChatManagerTool,
+            childChatId: String,
+            parentChatId: String?,
+            message: String,
+            timeoutMs: Long,
+            label: String
+    ) {
+        val outcome =
+                try {
+                    val sent =
+                            chatTools.sendMessageToAI(
+                                    AITool(
+                                            name = "send_message_to_ai",
+                                            parameters =
+                                                    listOf(
+                                                            ToolParameter(name = "chat_id", value = childChatId),
+                                                            ToolParameter(name = "message", value = message),
+                                                            ToolParameter(
+                                                                    name = "timeout_ms",
+                                                                    value = timeoutMs.toString()
+                                                            )
+                                                    )
+                                    )
+                            )
+                    val reply = (sent.result as? MessageSendResultData)?.aiResponse.orEmpty().trim()
+                    if (sent.success && reply.isNotEmpty()) {
+                        SubagentOutcome(true, reply, "")
+                    } else {
+                        SubagentOutcome(false, reply, classify(sent.error, reply))
+                    }
+                } catch (e: Exception) {
+                    SubagentOutcome(false, "", "调用失败")
+                }
+
+        if (parentChatId.isNullOrBlank()) {
+            AppLogger.w(TAG, "后台子体已结束，但拿不到父会话，无法唤醒：$childChatId")
+            return
+        }
+        try {
+            WakeRouter.submit(
+                    context.applicationContext,
+                    WakeEvent.forSubagentReturn(
+                            subChatId = childChatId,
+                            parentChatId = parentChatId,
+                            summary = renderSettlement(label, childChatId, outcome)
+                    )
+            )
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "后台子体结算唤醒投递失败：$childChatId", e)
+        }
+    }
+
+    private fun renderSettlement(
+            label: String,
+            childChatId: String,
+            outcome: SubagentOutcome
+    ): String =
+            buildString {
+                append("任务：").append(label.ifBlank { "（未命名）" }).append('\n')
+                if (outcome.succeeded) {
+                    append("状态：已完成\n")
+                    append("结论：\n")
+                    append(outcome.reply.take(4000))
+                    if (outcome.reply.length > 4000) {
+                        append("\n…（结论较长已截断，完整内容在子会话里）")
+                    }
+                } else {
+                    append("状态：失败（").append(outcome.failureClass).append("）\n")
+                    if (outcome.reply.isNotBlank()) {
+                        append("已产出的部分（可能不完整）：\n")
+                        append(outcome.reply.take(2000))
+                    } else {
+                        append("没有任何产出。")
+                    }
+                }
+            }
+
     // ==================== fork 的 seed ====================
 
     /**
@@ -301,6 +446,29 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
         return if (ms < 1000) "${ms}ms"
         else String.format(java.util.Locale.US, "%.1fs", ms / 1000.0)
     }
+
+    private fun renderBackgroundStarted(
+            label: String,
+            chatId: String,
+            seedNote: String,
+            parentChatId: String?
+    ): String =
+            buildString {
+                append("[子代理已在后台开始]\n")
+                append("任务：").append(label.ifBlank { "（未命名）" }).append('\n')
+                if (seedNote.isNotBlank()) append(seedNote).append('\n')
+                append("子会话：").append(chatId).append('\n')
+                append("----\n")
+                if (parentChatId.isNullOrBlank()) {
+                    append("跑完**不会**叫醒你：拿不到父会话 id。想看结果就用 get_chat_messages(chat_id=\"")
+                            .append(chatId)
+                            .append("\") 自己取。\n")
+                } else {
+                    append("跑完会主动在发起它的会话里叫醒你，**不要轮询、不要 sleep 等**。\n")
+                    append("要中途看进度就用 get_chat_messages(chat_id=\"").append(chatId).append("\")。\n")
+                }
+                append("随进程结束：应用被杀时这个子体也会中断，不会自动重跑。")
+            }
 
     private fun renderSuccess(
             label: String,
