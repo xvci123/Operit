@@ -6,6 +6,7 @@ import com.ai.assistance.operit.core.tools.ADBResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.system.AndroidShellExecutor
 import com.ai.assistance.operit.core.tools.system.ShizukuAuthorizer
+import com.ai.assistance.operit.core.tools.system.shell.CommandSafety
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
@@ -88,10 +89,12 @@ open class StandardShellToolExecutor(private val context: Context) {
             command.isNullOrBlank() -> {
                 ToolValidationResult(valid = false, errorMessage = "Command parameter is required")
             }
-            command.contains("rm -rf") || command.contains("format") -> {
+            CommandSafety.isCatastrophic(command) -> {
                 ToolValidationResult(
                         valid = false,
-                        errorMessage = "Potentially dangerous command detected"
+                        errorMessage =
+                                "Irreversible command blocked: " +
+                                        (CommandSafety.catastrophicReason(command) ?: "unknown")
                 )
             }
             else -> {

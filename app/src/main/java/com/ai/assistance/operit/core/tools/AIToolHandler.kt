@@ -5,6 +5,7 @@ import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.core.tools.mcp.MCPManager
 import com.ai.assistance.operit.core.tools.packTool.PackageManager
 import com.ai.assistance.operit.data.model.AITool
+import com.ai.assistance.operit.core.tools.system.shell.CommandSafety
 import com.ai.assistance.operit.data.model.ToolInvocation
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
@@ -98,6 +99,15 @@ class AIToolHandler private constructor(private val context: Context) {
 
     /** Ask hooks whether the tool call should continue. */
     fun checkToolInterception(tool: AITool): AIToolHookDecision {
+        // Hermes: 所有工具调用的统一入口（模型、插件 ToolPkg、MCP、HTTP 桥都会走到这里）。
+        // 只拦"不可逆"命令，其余一律放行；不再使用白名单。
+        val commandText =
+                tool.parameters.firstOrNull { it.name == "command" }?.value
+                        ?: tool.parameters.firstOrNull { it.name == "shell_command" }?.value
+        CommandSafety.catastrophicReason(commandText)?.let { reason ->
+            return AIToolHookDecision.Block("Irreversible command blocked: $reason")
+        }
+
         toolHooks.forEach { hook ->
             val decision =
                     try {
