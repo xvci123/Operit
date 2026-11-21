@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.rememberAsyncImagePainter
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.core.agent.wake.WakeCard
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.data.preferences.CharacterCardManager
@@ -427,6 +428,7 @@ fun BubbleUserMessageComposable(
                         ) {
                             if (isHiddenPlaceholder) {
                                 HiddenUserMessagePlaceholderContent(
+                                    title = WakeCard.titleOf(message.content),
                                     titleColor = effectiveTextColor,
                                     subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
                                 )
@@ -485,6 +487,7 @@ fun BubbleUserMessageComposable(
                                         ),
                                 ) {
                                     HiddenUserMessagePlaceholderContent(
+                                        title = WakeCard.titleOf(message.content),
                                         titleColor = effectiveTextColor,
                                         subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
                                     )
@@ -568,6 +571,7 @@ fun BubbleUserMessageComposable(
                         ) {
                             if (isHiddenPlaceholder) {
                                 HiddenUserMessagePlaceholderContent(
+                                    title = WakeCard.titleOf(message.content),
                                     titleColor = effectiveTextColor,
                                     subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
                                 )
@@ -626,6 +630,7 @@ fun BubbleUserMessageComposable(
                                         ),
                                 ) {
                                     HiddenUserMessagePlaceholderContent(
+                                        title = WakeCard.titleOf(message.content),
                                         titleColor = effectiveTextColor,
                                         subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
                                     )

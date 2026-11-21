@@ -20,6 +20,8 @@ import com.ai.assistance.operit.R
 @Composable
 fun HiddenUserMessagePlaceholderContent(
     modifier: Modifier = Modifier,
+    /** Hermes：唤醒卡片标题（如"后台任务已完成"）。为 null 时用原来的通用文案。 */
+    title: String? = null,
     titleColor: Color = MaterialTheme.colorScheme.onSurface,
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     accentColor: Color = MaterialTheme.colorScheme.primary,
@@ -35,7 +37,7 @@ fun HiddenUserMessagePlaceholderContent(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            text = stringResource(R.string.chat_hidden_user_message_badge),
+            text = title?.let { "\u21bb $it" } ?: stringResource(R.string.chat_hidden_user_message_badge),
             color = subtitleColor,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,

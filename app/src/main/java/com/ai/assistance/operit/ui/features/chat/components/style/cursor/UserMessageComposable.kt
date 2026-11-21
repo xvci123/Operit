@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.core.agent.wake.WakeCard
 import com.ai.assistance.operit.data.model.ChatMessage
 import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
@@ -286,6 +287,7 @@ fun UserMessageComposable(
                 )) {
                 if (isHiddenPlaceholder) {
                     HiddenUserMessagePlaceholderContent(
+                        title = WakeCard.titleOf(message.content),
                         titleColor = effectiveTextColor,
                         subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
                     )
