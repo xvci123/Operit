@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
@@ -701,7 +700,7 @@ class MainActivity : ComponentActivity() {
                     // 聊天页立即可用；插件在后台继续初始化。
                     HermesPluginProgressBarWithState(
                             loadingState = pluginLoadingState,
-                            modifier = Modifier.zIndex(10f).align(Alignment.TopCenter)
+                            modifier = Modifier.zIndex(10f)
                     )
 
                     // Hermes：冷启动动画。放在最后 → 盖在所有内容之上（包括插件加载页），
