@@ -103,6 +103,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.ai.assistance.operit.R
+import com.ai.assistance.operit.core.agent.subagents.SubagentRegistry
 import com.ai.assistance.operit.data.model.ChatHistory
 import com.ai.assistance.operit.data.model.CharacterCard
 import com.ai.assistance.operit.data.model.CharacterGroupCard
@@ -423,6 +424,19 @@ private fun HistoryQuickScroller(
     ExperimentalMaterial3Api::class
 )
 @Composable
+/**
+ * Hermes：这个会话是不是子智能体（不在列表里露脸）。
+ *
+ * 只过滤展示层。工具层（`StandardChatManagerTool`）读的是 `chatHistories` 全集，
+ * 过滤了会让 `send_message_to_ai` 认为子会话不存在。
+ */
+private fun isHiddenSubagentChat(context: android.content.Context, chatId: String): Boolean =
+    try {
+        SubagentRegistry.isSubagent(context, chatId)
+    } catch (e: Exception) {
+        false
+    }
+
 fun ChatHistorySelector(
         modifier: Modifier = Modifier,
         onNewChat: (characterCardName: String?, characterGroupId: String?) -> Unit,
@@ -601,15 +615,17 @@ fun ChatHistorySelector(
 
     val filteredHistories = remember(chatHistories, searchQuery, matchedChatIdsByContent) {
         val trimmedQuery = searchQuery.trim()
+        // Hermes：子智能体的会话不在列表里露脸（工具层仍然看得到，只有展示层过滤）
+        val visibleHistories = chatHistories.filterNot { isHiddenSubagentChat(context, it.id) }
         if (trimmedQuery.isNotBlank()) {
-            chatHistories.filter { history ->
+            visibleHistories.filter { history ->
                 val matchesTitleOrGroup = history.title.contains(trimmedQuery, ignoreCase = true) ||
                         (history.group?.contains(trimmedQuery, ignoreCase = true) == true)
                 val matchesContent = matchedChatIdsByContent.contains(history.id)
                 matchesTitleOrGroup || matchesContent
             }
         } else {
-            chatHistories
+            visibleHistories
         }
     }
     val groupIdsInFilteredHistories = remember(filteredHistories) {

@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.core.tools.subagent
 
 import android.content.Context
+import com.ai.assistance.operit.core.agent.subagents.SubagentRegistry
 import com.ai.assistance.operit.core.agent.wake.TurnContext
 import com.ai.assistance.operit.core.agent.wake.WakeEvent
 import com.ai.assistance.operit.core.agent.wake.WakeRouter
@@ -183,10 +184,26 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                     )
                 }
 
-                // 2. fork 时先把父会话已完成的轮次搬过去
+                // 2. 登记这个子会话：会话列表据此把它藏起来，父会话据此显示"派过谁"
+                try {
+                    SubagentRegistry.register(
+                            context.applicationContext,
+                            SubagentRegistry.Entry(
+                                    childChatId = chatId,
+                                    parentChatId = TurnContext.current(),
+                                    label = label,
+                                    forked = fork,
+                                    background = background
+                            )
+                    )
+                } catch (e: Exception) {
+                    AppLogger.w(TAG, "子代理登记失败（会话仍会出现在列表里）", e)
+                }
+
+                // 3. fork 时先把父会话已完成的轮次搬过去
                 val seedNote = if (fork) seedChildFromParent(chatId) else ""
 
-                // 3. 后台模式：立刻返回，跑完由唤醒路由回来找父会话
+                // 4. 后台模式：立刻返回，跑完由唤醒路由回来找父会话
                 if (background) {
                     val parentChatId = TurnContext.current()
                     val childChatIdForJob = chatId
@@ -216,7 +233,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                     )
                 }
 
-                // 3. 下发任务（带两段固定文字）
+                // 5. 下发任务（带两段固定文字）
                 val sent =
                         chatTools.sendMessageToAI(
                                 AITool(

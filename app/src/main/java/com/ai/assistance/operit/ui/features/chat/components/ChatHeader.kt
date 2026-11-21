@@ -43,7 +43,9 @@ fun ChatHeader(
         runningTaskCount: Int = 0,
         activeCharacterName: String,
         activeCharacterAvatarUri: String?,
-        onCharacterClick: () -> Unit
+        onCharacterClick: () -> Unit,
+        /** Hermes：本会话派出去的子智能体数量，>0 时显示一枚谱系 chip。 */
+        subagentCount: Int = 0
 ) {
         val displayCharacterName = activeCharacterName.toChatHeaderName()
 
@@ -52,6 +54,33 @@ fun ChatHeader(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = modifier
         ) {
+                if (subagentCount > 0) {
+                        Surface(
+                                modifier = Modifier.height(28.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                tonalElevation = 0.dp,
+                                shadowElevation = 0.dp
+                        ) {
+                                Row(
+                                        modifier = Modifier.height(28.dp).padding(horizontal = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                        Text(
+                                                text = "\u2442",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Text(
+                                                text = "${subagentCount} 个子代理",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                }
+                        }
+                }
+
                 if (runningTaskCount >= 2) {
                         Surface(
                                 onClick = onToggleChatHistorySelector,

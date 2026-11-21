@@ -139,6 +139,20 @@ fun ChatScreenHeader(
 
     val launchFloatingWindow = useFloatingWindowLauncher(actualViewModel, permissionLauncher)
 
+    // Hermes：父会话顶部显示"派出去几个子代理"
+    val currentChatIdForSubagents by actualViewModel.currentChatId.collectAsState()
+    val subagentCount =
+            remember(currentChatIdForSubagents) {
+                val chatId = currentChatIdForSubagents
+                if (chatId.isNullOrBlank()) 0
+                else
+                        try {
+                            com.ai.assistance.operit.core.agent.subagents.SubagentRegistry.countOf(context, chatId)
+                        } catch (e: Exception) {
+                            0
+                        }
+            }
+
     Row(
             modifier =
                     modifier
@@ -162,7 +176,8 @@ fun ChatScreenHeader(
                 runningTaskCount = activeStreamingChatIds.size,
                 activeCharacterName = activeCharacterGroup?.name ?: activeCharacterCard?.name ?: "",
                 activeCharacterAvatarUri = activeCharacterAvatarUri,
-                onCharacterClick = onCharacterSwitcherClick
+                onCharacterClick = onCharacterSwitcherClick,
+                subagentCount = subagentCount
         )
 
         Row(
