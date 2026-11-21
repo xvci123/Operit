@@ -632,6 +632,21 @@ object SystemToolPromptsInternal {
                     )
             ),
             SystemToolPromptCategory(
+                categoryName = "Interaction",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "ask_user",
+                            description = "Ask the user a question and wait for an answer (default 120s). Use it only when a choice or missing information blocks progress. Returns ANSWER / TIMEOUT / DISMISSED / BACKGROUND / STOPPED. If TIMEOUT, do not assume the user agreed.",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "question", type = "string", description = "required, the question to ask", required = true),
+                                ToolParameterSchema(name = "options", type = "string", description = "optional, up to 3 options separated by |", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, default 120000", required = false)
+                            )
+                        )
+                    )
+            ),
+            SystemToolPromptCategory(
                 categoryName = "Extended Memory Tools",
                 tools =
                     listOf(
@@ -3626,6 +3641,21 @@ object SystemToolPromptsInternal {
                             name = "device_info",
                             description = "获取设备信息。",
                             parametersStructured = listOf()
+                        )
+                    )
+            ),
+            SystemToolPromptCategory(
+                categoryName = "交互提问",
+                tools =
+                    listOf(
+                        ToolPrompt(
+                            name = "ask_user",
+                            description = "向用户提一个问题并等待回答（默认 120 秒）。仅在需要用户做选择或缺少关键信息时使用。返回 ANSWER / TIMEOUT / DISMISSED / BACKGROUND / STOPPED；若为 TIMEOUT，不要假设用户已同意。",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "question", type = "string", description = "必填，要问的问题", required = true),
+                                ToolParameterSchema(name = "options", type = "string", description = "可选，最多 3 个选项，用 | 分隔", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 120000", required = false)
+                            )
                         )
                     )
             ),

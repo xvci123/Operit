@@ -6,6 +6,7 @@ import com.ai.assistance.operit.api.chat.enhance.ToolExecutionManager
 import com.ai.assistance.operit.core.tools.climode.CliToolModeSupport
 import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
+import com.ai.assistance.operit.core.tools.ask.AskUserToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
@@ -1406,6 +1407,16 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                         )
                 )
             }
+    )
+
+    // Hermes: 交互式提问（模型主动问用户并等待回答）
+    handler.registerTool(
+            name = AskUserToolExecutor.TOOL_NAME,
+            descriptionGenerator = { tool ->
+                val question = tool.parameters.find { it.name == "question" }?.value ?: ""
+                "Ask user: $question"
+            },
+            executor = AskUserToolExecutor()
     )
 
     // Intent工具

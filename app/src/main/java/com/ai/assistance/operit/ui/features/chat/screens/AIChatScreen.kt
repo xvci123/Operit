@@ -56,6 +56,7 @@ import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
 import com.ai.assistance.operit.data.preferences.UserPreferencesManager
 import com.ai.assistance.operit.data.preferences.WaifuPreferences
 import com.ai.assistance.operit.ui.components.ErrorDialog
+import com.ai.assistance.operit.ui.features.chat.components.AskUserDialogHost
 import com.ai.assistance.operit.ui.features.chat.components.*
 import com.ai.assistance.operit.ui.features.chat.components.style.input.agent.AgentChatInputSection
 import com.ai.assistance.operit.ui.features.chat.components.style.input.classic.ClassicChatInputSection
@@ -874,6 +875,8 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
         }
     val chatViewportTranslationYPx = inputBarTranslationYPx
     Box(modifier = Modifier.fillMaxSize()) {
+        // Hermes: ask_user 的界面宿主
+        AskUserDialogHost()
         CustomScaffold(
                 containerColor = Color.Transparent,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
