@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.core.tools.subagent
 
 import android.content.Context
+import com.ai.assistance.operit.core.agent.wake.TurnContext
 import com.ai.assistance.operit.core.tools.MessageSendResultData
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
@@ -9,16 +10,18 @@ import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
+import com.ai.assistance.operit.data.repository.ChatHistoryManager
 import kotlinx.coroutines.runBlocking
 
 /**
  * `spawn_subagent`：父 AI 派生一个子智能体去干活（Hermes 新增）。
  *
- * 机制参考 DSHA 的 dsh-tool-subagent：
- *  - 子体是一个**独立会话**，不继承父的对话，只拿到任务描述
- *  - 任务消息里附带两段固定文字：作用域声明 + 回报要求
- *  - 干完一轮后，结果作为**本次工具调用的返回值**交回父 AI
- *  - 父体只拿到**最终结论**，拿不到子体的工具输出与思考过程
+ * 机制参考 DSHA 的 dsh-tool-subagent，两种模式只差一个 seed：
+ *  - **spawn（默认）**：子体独立会话、零历史，任务描述必须自带全部上下文
+ *  - **fork**：把父会话"已完成的轮次"复制给子体（不含当前正在跑的这一轮），
+ *    子体可以直接引用上面的对话，不用重新交代背景
+ *
+ * 两种模式其余完全一样：同样的作用域声明、同样的回报要求、同样的失败语义。
  *
  * 失败语义（照 DSHA 的 stopReason 映射改过来）：
  *  - 成功：`[子代理已返回]` + 结论
@@ -39,6 +42,9 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
         const val DEFAULT_TIMEOUT_MS = 300_000L
         const val TITLE_PREFIX = "[子代理] "
 
+        /** fork 时最多搬多少条历史：手机上下文经不起把整段长对话塞给子体。 */
+        const val MAX_SEED_MESSAGES = 60
+
         /** 作用域声明：告诉子体它的权限边界，避免它反复重试被拒绝的操作。 */
         private val SCOPE_BLOCK =
                 """
@@ -50,16 +56,29 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                 """
                         .trimIndent()
 
-        /** 回报要求：拼在任务末尾。 */
-        private val REPORT_BLOCK =
+        /** fork 模式：告诉子体它继承了什么（DSHA 的 fork 说法，见 dsh-tool-subagent:344-352）。 */
+        private val FORK_NOTE =
                 """
+                [上下文继承]
+                你继承了这个会话**已经完成的对话**（不含父 agent 当前正在跑的这一轮）。
+                可以直接引用上面的内容，不用重新交代背景；父 agent 当前那一轮在干什么，你看不到。
+                """
+                        .trimIndent()
+
+        /** 回报要求：拼在任务末尾（spawn 与 fork 只差第一句）。 */
+        private fun reportBlock(forked: Boolean): String {
+            val header =
+                    if (forked) "你看得到历史，但父 agent 看不到你的工具输出和思考过程。"
+                    else "父 agent 看不到你的对话记录、工具输出和思考过程。"
+            return """
                 [回报要求]
                 你的父 agent 就是派你来干活的会话。完成之前，把结论整理成**自包含**的结果直接输出：
-                父 agent 看不到你的对话记录、工具输出和思考过程，所以不要写"见上""如前所述"。
+                $header所以不要写"见上""如前所述"，历史里的东西也要在结论里点明是哪一段。
                 请给出：做了什么、结果是什么、有没有没做成的地方和原因。
                 [/回报要求]
                 """
-                        .trimIndent()
+                    .trimIndent()
+        }
     }
 
     override fun invoke(tool: AITool): ToolResult {
@@ -74,6 +93,13 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
         }
 
         val label = tool.parameters.find { it.name == "description" }?.value?.trim().orEmpty()
+        val fork =
+                tool.parameters
+                        .find { it.name == "fork" }
+                        ?.value
+                        ?.trim()
+                        ?.lowercase()
+                        .let { it == "true" || it == "1" || it == "yes" }
         val timeoutMs =
                 tool.parameters.find { it.name == "timeout_ms" }?.value?.toLongOrNull()
                         ?: DEFAULT_TIMEOUT_MS
@@ -83,10 +109,14 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                 buildString {
                     appendLine(SCOPE_BLOCK)
                     appendLine()
+                    if (fork) {
+                        appendLine(FORK_NOTE)
+                        appendLine()
+                    }
                     appendLine("任务：")
                     appendLine(task)
                     appendLine()
-                    append(REPORT_BLOCK)
+                    append(reportBlock(fork))
                 }
 
         return runBlocking {
@@ -116,6 +146,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                             created.error ?: "未知原因",
                             "",
                             "",
+                            "",
                             startedAt
                     )
                 }
@@ -128,11 +159,15 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                             "创建成功但拿不到 chatId",
                             "",
                             "",
+                            "",
                             startedAt
                     )
                 }
 
-                // 2. 下发任务（带两段固定文字）
+                // 2. fork 时先把父会话已完成的轮次搬过去
+                val seedNote = if (fork) seedChildFromParent(chatId) else ""
+
+                // 3. 下发任务（带两段固定文字）
                 val sent =
                         chatTools.sendMessageToAI(
                                 AITool(
@@ -157,7 +192,17 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                     ToolResult(
                             toolName = tool.name,
                             success = true,
-                            result = StringResultData(renderSuccess(label, task, chatId, reply, startedAt))
+                            result =
+                                    StringResultData(
+                                            renderSuccess(
+                                                    label = label,
+                                                    task = task,
+                                                    chatId = chatId,
+                                                    reply = reply,
+                                                    seedNote = seedNote,
+                                                    startedAt = startedAt
+                                            )
+                                    )
                     )
                 } else {
                     fail(
@@ -167,6 +212,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                                     ?: if (reply.isEmpty()) "子代理没有产出任何文字" else "",
                             reply,
                             chatId,
+                            seedNote,
                             startedAt
                     )
                 }
@@ -177,6 +223,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                         e.message ?: e.javaClass.simpleName,
                         "",
                         chatId,
+                        "",
                         startedAt
                 )
             }
@@ -189,6 +236,61 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
             ToolValidationResult(valid = false, errorMessage = "task 参数必填")
         } else {
             ToolValidationResult(valid = true)
+        }
+    }
+
+    // ==================== fork 的 seed ====================
+
+    /**
+     * fork 的全部复杂度就在这一刀（DSHA 的结论：seed = 父日志最后一个 turn/end 之前的前缀）。
+     *
+     * 父会话里最后一条 `user` 消息就是**当前正在跑的这一轮**——它还没结束，复制过去等于让子体重放它，
+     * 而且会把父体的半截结论喂给子体。所以从最后一条 user 消息切开，只搬它之前的部分。
+     *
+     * 拿不到父会话（不是从对话里发起的，或者已经超时）时不报错，退化成普通 spawn 并说明原因。
+     */
+    private suspend fun seedChildFromParent(childChatId: String): String {
+        val parentChatId = TurnContext.current()
+        if (parentChatId.isNullOrBlank()) {
+            return "继承：跳过（拿不到父会话 id，子体按普通 spawn 处理）"
+        }
+        if (parentChatId == childChatId) {
+            return "继承：跳过（父会话与子会话相同）"
+        }
+        val history =
+                try {
+                    ChatHistoryManager.getInstance(context).loadChatMessages(parentChatId)
+                } catch (e: Exception) {
+                    return "继承：失败（读取父会话出错：${e.message ?: e.javaClass.simpleName}）"
+                }
+        if (history.isEmpty()) {
+            return "继承：跳过（父会话还没有消息）"
+        }
+        val cut = history.indexOfLast { it.sender == "user" }
+        if (cut <= 0) {
+            return "继承：跳过（父会话还没有已完成的轮次）"
+        }
+        val prefix = history.subList(0, cut)
+        val trimmed =
+                if (prefix.size > MAX_SEED_MESSAGES) prefix.subList(prefix.size - MAX_SEED_MESSAGES, prefix.size)
+                else prefix
+        val manager = ChatHistoryManager.getInstance(context)
+        var copied = 0
+        var failed = 0
+        trimmed.forEach { message ->
+            try {
+                manager.addMessage(childChatId, message)
+                copied += 1
+            } catch (e: Exception) {
+                failed += 1
+            }
+        }
+        return buildString {
+            append("继承：").append(copied).append(" 条父会话已完成的消息")
+            if (trimmed.size < prefix.size) {
+                append("（父会话太长，只取最近 ").append(MAX_SEED_MESSAGES).append(" 条）")
+            }
+            if (failed > 0) append("（有 ").append(failed).append(" 条复制失败）")
         }
     }
 
@@ -205,12 +307,14 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
             task: String,
             chatId: String,
             reply: String,
+            seedNote: String,
             startedAt: Long
     ): String =
             buildString {
                 append("[子代理已返回]\n")
                 append("任务：").append(label.ifBlank { firstLine(task) }).append('\n')
                 append("用时：").append(elapsedText(startedAt)).append('\n')
+                if (seedNote.isNotBlank()) append(seedNote).append('\n')
                 append("子会话：").append(chatId)
                 append("（需要细节用 get_chat_messages(chat_id=\"").append(chatId).append("\") 去取）\n")
                 append("----\n")
@@ -229,6 +333,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
             reason: String,
             reply: String,
             chatId: String,
+            seedNote: String,
             startedAt: Long
     ): ToolResult {
         val body =
@@ -237,6 +342,7 @@ class SpawnSubagentToolExecutor(private val context: Context) : ToolExecutor {
                     append("状态：").append(status).append('\n')
                     if (reason.isNotBlank()) append("原因：").append(reason).append('\n')
                     append("用时：").append(elapsedText(startedAt)).append('\n')
+                    if (seedNote.isNotBlank()) append(seedNote).append('\n')
                     if (chatId.isNotBlank()) {
                         append("子会话：").append(chatId)
                         append("（它到底做了什么，用 get_chat_messages(chat_id=\"")
