@@ -67,6 +67,7 @@ import com.ai.assistance.operit.data.model.ChatMessageDisplayMode
 import com.ai.assistance.operit.ui.features.chat.components.attachments.AttachmentViewerDialog
 import com.ai.assistance.operit.ui.features.chat.components.attachments.ChatAttachment
 import com.ai.assistance.operit.ui.features.chat.components.style.common.HiddenUserMessagePlaceholderContent
+import com.ai.assistance.operit.ui.features.chat.components.style.common.WakeCardRow
 import com.ai.assistance.operit.api.chat.llmprovider.MediaLinkParser
 import com.ai.assistance.operit.ui.theme.isLiquidGlassSupported
 import com.ai.assistance.operit.ui.theme.isWaterGlassSupported
@@ -286,11 +287,22 @@ fun UserMessageComposable(
                     bottom = if (isHiddenPlaceholder) 0.dp else 16.dp,
                 )) {
                 if (isHiddenPlaceholder) {
-                    HiddenUserMessagePlaceholderContent(
-                        title = WakeCard.titleOf(message.content),
-                        titleColor = effectiveTextColor,
-                        subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
-                    )
+                    // Hermes：能解析出唤醒卡片就渲染可折叠卡片，否则退回原来的通用占位条
+                    val wakeCard = remember(message.content) { WakeCard.parse(message.content) }
+                    if (wakeCard != null) {
+                        WakeCardRow(
+                            title = wakeCard.title,
+                            body = wakeCard.body,
+                            titleColor = effectiveTextColor,
+                            subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
+                        )
+                    } else {
+                        HiddenUserMessagePlaceholderContent(
+                            title = WakeCard.titleOf(message.content),
+                            titleColor = effectiveTextColor,
+                            subtitleColor = effectiveTextColor.copy(alpha = 0.72f),
+                        )
+                    }
                 } else {
                     // 用户消息标题
                     Text(

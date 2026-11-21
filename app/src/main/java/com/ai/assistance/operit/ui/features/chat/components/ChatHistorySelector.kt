@@ -419,11 +419,6 @@ private fun HistoryQuickScroller(
     }
 }
 
-@OptIn(
-    ExperimentalFoundationApi::class,
-    ExperimentalMaterial3Api::class
-)
-@Composable
 /**
  * Hermes：这个会话是不是子智能体（不在列表里露脸）。
  *
@@ -437,6 +432,11 @@ private fun isHiddenSubagentChat(context: android.content.Context, chatId: Strin
         false
     }
 
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class
+)
+@Composable
 fun ChatHistorySelector(
         modifier: Modifier = Modifier,
         onNewChat: (characterCardName: String?, characterGroupId: String?) -> Unit,

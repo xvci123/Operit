@@ -50,6 +50,7 @@ import com.ai.assistance.operit.ui.features.startup.screens.PluginLoadingState
 import com.ai.assistance.operit.ui.features.startup.screens.LocalPluginLoadingState
 import com.ai.assistance.operit.ui.features.startup.screens.PluginLoadingStateRegistry
 import com.ai.assistance.operit.ui.theme.OperitTheme
+import com.ai.assistance.operit.ui.hermes.HermesSplash
 import com.ai.assistance.operit.ui.common.displays.VirtualDisplayOverlay
 import com.ai.assistance.operit.util.AnrMonitor
 import com.ai.assistance.operit.util.LocaleUtils
@@ -74,6 +75,8 @@ class MainActivity : ComponentActivity() {
 
     // ======== 屏幕方向变更状态 ========
     private var showOrientationChangeDialog by mutableStateOf(false)
+    /** Hermes：冷启动动画是否已播过（Activity 存活期内只播一次，进程重启自然重置）。 */
+    private var hermesSplashDone by mutableStateOf(false)
 
     private var lastOrientation: Int? = null
 
@@ -697,6 +700,12 @@ class MainActivity : ComponentActivity() {
                             loadingState = pluginLoadingState,
                             modifier = Modifier.zIndex(10f) // 确保加载界面在最上层
                     )
+
+                    // Hermes：冷启动动画。放在最后 → 盖在所有内容之上（包括插件加载页），
+                    // 2 秒后自己撤掉，主界面早就在底下布局好了，不会有跳转闪烁。
+                    if (!hermesSplashDone) {
+                        HermesSplash(onFinished = { hermesSplashDone = true })
+                    }
                 }
 
                 // 方向改变时显示对话框
