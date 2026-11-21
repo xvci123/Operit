@@ -56,25 +56,6 @@ class AndroidShellExecutor {
             }
         }
 
-        /**
-         * 首选级别不可用时允许降级，避免"选了 Shizuku 但没授权 → 所有命令直接失败"。
-         *
-         * ACCESSIBILITY 不参与降级：它的执行器当前不执行任何命令，选它等于关掉 shell，
-         * 这里统一回落到 STANDARD。
-         */
-        private fun fallbackChain(preferred: AndroidPermissionLevel): List<AndroidPermissionLevel> {
-            val ladder =
-                    listOf(
-                            AndroidPermissionLevel.ROOT,
-                            AndroidPermissionLevel.DEBUGGER,
-                            AndroidPermissionLevel.ADMIN,
-                            AndroidPermissionLevel.STANDARD
-                    )
-            val start = ladder.indexOf(preferred)
-            if (start < 0) return listOf(AndroidPermissionLevel.STANDARD)
-            return ladder.drop(start)
-        }
-
         private fun buildStrictUnavailableReason(
             level: AndroidPermissionLevel,
             executorAvailable: Boolean,
@@ -108,63 +89,41 @@ class AndroidShellExecutor {
             // 如果调用方显式指定了身份，就直接向下传递；否则使用默认身份
             val identity = identityOverride ?: ShellIdentity.DEFAULT
 
-            val actualLevel = getPreferredPermissionLevelCached() ?: AndroidPermissionLevel.STANDARD
+            val preferredLevel = getPreferredPermissionLevelCached()
+            val actualLevel = preferredLevel ?: AndroidPermissionLevel.STANDARD
 
-            var lastReason = ""
-            for (level in fallbackChain(actualLevel)) {
-                val executor = ShellExecutorFactory.getExecutor(ctx, level)
-                val permStatus = executor.hasPermission()
-                if (executor.isAvailable() && permStatus.granted) {
-                    if (level != actualLevel) {
-                        AppLogger.d(
-                                TAG,
-                                "Preferred ${getPermissionLevelLabel(actualLevel)} unavailable, " +
-                                        "degraded to ${getPermissionLevelLabel(level)}"
-                        )
-                    }
-                    val result = executor.executeCommand(command, identity)
-                    return CommandResult(
-                            result.success,
-                            result.stdout,
-                            result.stderr,
-                            result.exitCode
-                    )
-                }
-                lastReason = buildStrictUnavailableReason(level, executor.isAvailable(), permStatus)
+            val preferredExecutor = ShellExecutorFactory.getExecutor(ctx, actualLevel)
+            val permStatus = preferredExecutor.hasPermission()
+            val executorAvailable = preferredExecutor.isAvailable()
+
+            if (executorAvailable && permStatus.granted) {
+                val result = preferredExecutor.executeCommand(command, identity)
+                return CommandResult(result.success, result.stdout, result.stderr, result.exitCode)
             }
 
-            AppLogger.d(TAG, "No shell channel available. $lastReason")
-            return CommandResult(
-                    false,
-                    "",
-                    lastReason.ifBlank { "No shell channel available" },
-                    -1
-            )
+            val reason = buildStrictUnavailableReason(actualLevel, executorAvailable, permStatus)
+
+            AppLogger.d(TAG, "Strict permission mode enabled. $reason")
+            return CommandResult(false, "", reason, -1)
         }
 
         suspend fun startShellProcess(command: String): ShellProcess {
             val ctx = context ?: throw IllegalStateException("Context not initialized")
 
-            val actualLevel = getPreferredPermissionLevelCached() ?: AndroidPermissionLevel.STANDARD
+            val preferredLevel = getPreferredPermissionLevelCached()
+            val actualLevel = preferredLevel ?: AndroidPermissionLevel.STANDARD
+            val preferredExecutor = ShellExecutorFactory.getExecutor(ctx, actualLevel)
+            val permStatus = preferredExecutor.hasPermission()
+            val executorAvailable = preferredExecutor.isAvailable()
 
-            var lastReason = ""
-            for (level in fallbackChain(actualLevel)) {
-                val executor = ShellExecutorFactory.getExecutor(ctx, level)
-                val permStatus = executor.hasPermission()
-                if (executor.isAvailable() && permStatus.granted) {
-                    if (level != actualLevel) {
-                        AppLogger.d(
-                                TAG,
-                                "Preferred ${getPermissionLevelLabel(actualLevel)} unavailable, " +
-                                        "degraded to ${getPermissionLevelLabel(level)}"
-                        )
-                    }
-                    return executor.startProcess(command)
-                }
-                lastReason = buildStrictUnavailableReason(level, executor.isAvailable(), permStatus)
+            if (executorAvailable && permStatus.granted) {
+                return preferredExecutor.startProcess(command)
             }
 
-            throw SecurityException(lastReason.ifBlank { "No shell channel available" })
+            val reason = buildStrictUnavailableReason(actualLevel, executorAvailable, permStatus)
+
+            AppLogger.d(TAG, "Strict permission mode enabled. $reason")
+            throw SecurityException(reason)
         }
     }
 
