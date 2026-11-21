@@ -68,13 +68,13 @@ class StandardShellExecutor(private val context: Context) : ShellExecutor {
                     // 读取标准输出
                     val stdout =
                             BufferedReader(InputStreamReader(process.inputStream)).use {
-                                it.readText()
+                                ShellGuard.readCapped(it)
                             }
 
                     // 读取错误输出
                     val stderr =
                             BufferedReader(InputStreamReader(process.errorStream)).use {
-                                it.readText()
+                                ShellGuard.readCapped(it)
                             }
 
                     val exitCode = process.exitValue()
@@ -122,13 +122,13 @@ class StandardShellExecutor(private val context: Context) : ShellExecutor {
                     // 读取标准输出
                     val stdout =
                             BufferedReader(InputStreamReader(process.inputStream)).use {
-                                it.readText()
+                                ShellGuard.readCapped(it)
                             }
 
                     // 读取错误输出
                     val stderr =
                             BufferedReader(InputStreamReader(process.errorStream)).use {
-                                it.readText()
+                                ShellGuard.readCapped(it)
                             }
 
                     val exitCode = process.exitValue()

@@ -13,6 +13,7 @@ import java.io.InputStreamReader
 import java.io.InterruptedIOException
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import moe.shizuku.server.IShizukuService
@@ -213,6 +214,8 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
     private suspend fun executeCommandDirect(command: String): ShellExecutor.CommandResult =
             withContext(Dispatchers.IO) {
                 var process: Any? = null
+                var timedOut = false
+                var watchdog: Job? = null
 
                 try {
                     val service =
@@ -237,6 +240,16 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                         )
                     }
 
+                    // Hermes: 超时看门狗。原实现 waitFor/readText 会无限期阻塞，
+                    // 一条 `logcat` 就能把 Shizuku 通道永久占死。
+                    val directHandle = process
+                    watchdog =
+                            launch {
+                                delay(ShellGuard.DEFAULT_TIMEOUT_MS)
+                                timedOut = true
+                                ShellGuard.destroyQuietly(directHandle)
+                            }
+
                     // 将ParcelFileDescriptor转换为InputStream
                     val processClass = process::class.java
                     val inputStream =
@@ -252,7 +265,7 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                 retryOperation {
                                     val stdoutStream = FileInputStream(inputStream.fileDescriptor)
                                     BufferedReader(InputStreamReader(stdoutStream)).use {
-                                        it.readText()
+                                        ShellGuard.readCapped(it)
                                     }
                                 }
                             } else ""
@@ -262,12 +275,16 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                 retryOperation {
                                     val stderrStream = FileInputStream(errorStream.fileDescriptor)
                                     BufferedReader(InputStreamReader(stderrStream)).use {
-                                        it.readText()
+                                        ShellGuard.readCapped(it)
                                     }
                                 }
                             } else ""
 
                     val exitCode = processClass.getMethod("waitFor").invoke(process) as Int
+
+                    if (timedOut) {
+                        return@withContext ShellGuard.timeoutResult(command)
+                    }
 
                     // 返回结果
                     return@withContext ShellExecutor.CommandResult(
@@ -287,6 +304,7 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                     AppLogger.e(TAG, "Error executing command", e)
                     return@withContext ShellExecutor.CommandResult(false, "", "Error: ${e.message}")
                 } finally {
+                    watchdog?.cancel()
                     // 安全关闭文件描述符
                     try {
                         if (process != null) {
@@ -318,6 +336,8 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
     /** 通过shell解释器执行包含特殊操作符的命令 */
     private suspend fun executeWithShell(command: String): ShellExecutor.CommandResult =
             withContext(Dispatchers.IO) {
+                var timedOut = false
+                var watchdog: Job? = null
                 try {
                     val service =
                             getShizukuService()
@@ -363,6 +383,14 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                             "",
                                             "Failed to create process"
                                     )
+
+                    // Hermes: 超时看门狗（后台命令不挂，见下方 isBackground 分支）
+                    watchdog =
+                            launch {
+                                delay(ShellGuard.DEFAULT_TIMEOUT_MS)
+                                timedOut = true
+                                ShellGuard.destroyQuietly(process)
+                            }
                     // 处理输入输出流
                     val processClass = process::class.java
                     val inputStream =
@@ -387,6 +415,7 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                             AppLogger.e(TAG, "Error closing error stream for background shell command", e)
                         }
 
+                        watchdog?.cancel()
                         return@withContext ShellExecutor.CommandResult(
                                 true,
                                 "",
@@ -401,7 +430,7 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                 retryOperation {
                                     val stdoutStream = FileInputStream(inputStream.fileDescriptor)
                                     BufferedReader(InputStreamReader(stdoutStream)).use {
-                                        it.readText()
+                                        ShellGuard.readCapped(it)
                                     }
                                 }
                             } else ""
@@ -411,12 +440,17 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                 retryOperation {
                                     val stderrStream = FileInputStream(errorStream.fileDescriptor)
                                     BufferedReader(InputStreamReader(stderrStream)).use {
-                                        it.readText()
+                                        ShellGuard.readCapped(it)
                                     }
                                 }
                             } else ""
 
                     val exitCode = processClass.getMethod("waitFor").invoke(process) as Int
+                    watchdog?.cancel()
+
+                    if (timedOut) {
+                        return@withContext ShellGuard.timeoutResult(command)
+                    }
 
                     // 关闭文件描述符
                     try {
@@ -448,6 +482,7 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                             exitCode
                     )
                 } catch (e: Exception) {
+                    watchdog?.cancel()
                     AppLogger.e(TAG, "Error executing shell command", e)
                     return@withContext ShellExecutor.CommandResult(false, "", "Error: ${e.message}")
                 }
