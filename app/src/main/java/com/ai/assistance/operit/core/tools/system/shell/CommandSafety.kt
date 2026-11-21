@@ -3,9 +3,22 @@ package com.ai.assistance.operit.core.tools.system.shell
 /**
  * Hermes 命令判定层（替换原来的 `contains("rm -rf") || contains("format")`）。
  *
- * 设计原则：**默认放行**。只有「不可逆且会造成整机/整盘损坏」的命令才会被识别出来，
- * 其余命令（包括 `--format json` 这类正常参数、`format` 作为普通字符串出现在路径或参数里）
+ * 设计原则：**默认放行 + 硬限制永远生效**。
+ *
+ * 这里判定的是「硬限制」（H1~H6）：无论用户在设置里关掉多少确认，这些操作一律拒绝。
+ * 其余命令（包括 `--format json` 这类正常参数、`rm -rf /sdcard/xxx` 这类可恢复操作）
  * 一律放行。
+ *
+ * 硬限制清单：
+ *  H1 写块设备      `> /dev/block/*`、`dd of=/dev/block/*`、`of=/dev/mmcblk*` 等
+ *  H2 格式化/分区   `mkfs*`、`mke2fs`、`wipefs`、`fdisk`、`sgdisk`、`parted`
+ *  H3 递归删系统根  `rm -r /`、`rm -r /system`、`find / -delete`
+ *  H4 改分区挂载    `mount -o remount,rw /system`、`setenforce 0`
+ *  H5 刷机/恢复     `fastboot`、`recovery --wipe*`
+ *  H6 恢复出厂/重启  `am broadcast ... FACTORY_RESET`、`reboot`、`shutdown`
+ *
+ * 能力边界：这是命令文本层的拦截，防的是模型误操作，不是沙盒。
+ * 多层 `sh -c` 嵌套、base64 解码后执行、自编译二进制等方式可以绕过。
  *
  * 能识别、而旧实现识别不了的写法：
  *  - `rm -fr` / `rm -r -f` / `rm --recursive --force` / `rm -Rf`
@@ -139,9 +152,46 @@ object CommandSafety {
             "rm" -> checkRm(args)
             "dd" -> checkDd(args)
             "find" -> checkFind(args)
-            "mkfs", "mke2fs", "wipefs", "fdisk", "sgdisk", "parted" -> "改写磁盘或分区：$program"
+            "mkfs", "mke2fs", "wipefs", "fdisk", "sgdisk", "parted" ->
+                    "改写磁盘或分区：$program"
+            "setenforce" ->
+                    if (args.firstOrNull()?.startsWith("0") == true) "关闭 SELinux：setenforce 0"
+                    else null
+            "mount" -> checkMount(args)
+            "reboot" -> "重启设备：reboot"
+            "shutdown" -> "关机：shutdown"
+            "fastboot" -> "刷机操作：fastboot"
+            "recovery" ->
+                    if (args.any { it.startsWith("--wipe") }) "恢复模式擦除：recovery" else null
+            "am" -> checkAm(args)
             else -> if (program.startsWith("mkfs.")) "格式化分区：$program" else null
         }
+    }
+
+    /** 把系统分区重新挂载为可写。 */
+    private fun checkMount(args: List<String>): String? {
+        val isRemount = args.any { it.contains("remount") }
+        val wantsWrite =
+                args.any { it == "rw" || it.startsWith("rw,") || it.contains(",rw") || it == "-w" }
+        if (!isRemount || !wantsWrite) return null
+        val targets =
+                listOf("/", "/system", "/system_ext", "/vendor", "/product", "/boot", "/data")
+        val hit =
+                args.firstOrNull { arg ->
+                    arg.startsWith("/") && targets.any { arg == it || arg.startsWith("$it/") }
+                }
+        return "把系统分区重新挂载为可写：${hit ?: "/system"}"
+    }
+
+    /** 通过广播触发恢复出厂设置。 */
+    private fun checkAm(args: List<String>): String? {
+        if (args.none { it == "broadcast" }) return null
+        val reset =
+                args.any {
+                    it.contains("FACTORY_RESET", ignoreCase = true) ||
+                            it.contains("MASTER_CLEAR", ignoreCase = true)
+                }
+        return if (reset) "恢复出厂设置广播" else null
     }
 
     private fun isKnownProgram(name: String): Boolean {
