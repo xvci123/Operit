@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit
 import com.ai.assistance.operit.BuildConfig
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.core.agent.wake.WakeRouter
+import com.ai.assistance.operit.core.hermes.HermesSkin
 import com.ai.assistance.operit.core.chat.AIMessageManager
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.api.chat.library.MemoryAutoSaveScheduler
@@ -176,6 +177,15 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
         val defaultProfileName = applicationContext.getString(R.string.default_profile)
         initUserPreferencesManager(applicationContext, defaultProfileName)
         AppLogger.d(TAG, "【启动计时】用户偏好管理器初始化完成 - ${System.currentTimeMillis() - startTime}ms")
+
+        // Hermes：第一次启动把主题写成黑蓝调（只写一次，之后用户在设置里怎么改都不覆盖）
+        applicationScope.launch {
+            try {
+                HermesSkin.seedIfNeeded(applicationContext)
+            } catch (error: Throwable) {
+                AppLogger.w(TAG, "Hermes 皮肤种子失败", error)
+            }
+        }
 
         // Run the legacy token import during startup so upgrades retain statistics
         // even when the user opens another screen before visiting token stats.

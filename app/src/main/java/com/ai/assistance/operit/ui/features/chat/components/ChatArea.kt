@@ -471,6 +471,7 @@ fun ChatArea(
                             index = actualIndex,
                             currentChatId = currentChatId,
                             message = message,
+                            initialThinkingExpanded = isLoading && isLastAiMessage,
                             enableDialogs = enableDialogs,
                             userMessageColor = userMessageColor,
                             aiMessageColor = aiMessageColor,
@@ -679,6 +680,8 @@ private fun MessageItem(
     bubbleAiBubbleLiquidGlass: Boolean = false,
     bubbleAiBubbleWaterGlass: Boolean = false,
     isHidden: Boolean = false, // 新增参数控制隐藏
+    // Hermes：流式消息进来就自动展开思考块，答完自动收起（CustomXmlRenderer 已有收起逻辑）
+    initialThinkingExpanded: Boolean = false,
     isMultiSelectMode: Boolean = false, // 是否处于多选模式
     isSelected: Boolean = false, // 是否被选中
     onToggleSelection: (() -> Unit)? = null, // 切换选中状态的回调
@@ -773,7 +776,7 @@ private fun MessageItem(
                         thinkingBackgroundColor = thinkingBackgroundColor,
                         thinkingTextColor = thinkingTextColor,
                         supportToolMarkup = true,
-                        initialThinkingExpanded = false,
+                        initialThinkingExpanded = initialThinkingExpanded,
                         onDeleteMessage = onDeleteMessage,
                         index = index,
                         enableDialogs = enableDialogs,
