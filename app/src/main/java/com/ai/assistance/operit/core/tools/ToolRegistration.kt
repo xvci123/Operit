@@ -7,6 +7,7 @@ import com.ai.assistance.operit.core.tools.climode.CliToolModeSupport
 import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.core.tools.defaultTool.ToolGetter
 import com.ai.assistance.operit.core.tools.ask.AskUserToolExecutor
+import com.ai.assistance.operit.core.tools.subagent.SpawnSubagentToolExecutor
 import com.ai.assistance.operit.data.model.AITool
 import com.ai.assistance.operit.data.model.ToolParameter
 import com.ai.assistance.operit.data.model.ToolResult
@@ -1417,6 +1418,16 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
                 "Ask user: $question"
             },
             executor = AskUserToolExecutor()
+    )
+
+    // Hermes: 派生子智能体（独立会话 + 两段固定提示词，结果作为返回值交回）
+    handler.registerTool(
+            name = SpawnSubagentToolExecutor.TOOL_NAME,
+            descriptionGenerator = { tool ->
+                val description = tool.parameters.find { it.name == "description" }?.value ?: ""
+                "Spawn subagent: $description"
+            },
+            executor = SpawnSubagentToolExecutor(context)
     )
 
     // Intent工具

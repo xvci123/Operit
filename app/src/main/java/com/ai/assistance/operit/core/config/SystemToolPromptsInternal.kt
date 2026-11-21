@@ -643,6 +643,15 @@ object SystemToolPromptsInternal {
                                 ToolParameterSchema(name = "options", type = "string", description = "optional, up to 3 options separated by |", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, default 120000", required = false)
                             )
+                        ),
+                        ToolPrompt(
+                            name = "spawn_subagent",
+                            description = "Spawn a subagent in a separate chat to handle a self-contained task, then return its final result. The subagent cannot see your conversation. Use it for long or parallel work.",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "task", type = "string", description = "required, self-contained task description", required = true),
+                                ToolParameterSchema(name = "description", type = "string", description = "optional, short label for the subagent", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, default 300000", required = false)
+                            )
                         )
                     )
             ),
@@ -3655,6 +3664,15 @@ object SystemToolPromptsInternal {
                                 ToolParameterSchema(name = "question", type = "string", description = "必填，要问的问题", required = true),
                                 ToolParameterSchema(name = "options", type = "string", description = "可选，最多 3 个选项，用 | 分隔", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 120000", required = false)
+                            )
+                        ),
+                        ToolPrompt(
+                            name = "spawn_subagent",
+                            description = "派一个子智能体在独立会话里处理一件自包含的任务，并把它最终的结果带回来。子智能体看不到你的对话。适合耗时较长或可以并行的工作。",
+                            parametersStructured = listOf(
+                                ToolParameterSchema(name = "task", type = "string", description = "必填，自包含的任务描述", required = true),
+                                ToolParameterSchema(name = "description", type = "string", description = "可选，给子智能体的短标签", required = false),
+                                ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 300000", required = false)
                             )
                         )
                     )
