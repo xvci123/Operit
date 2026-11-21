@@ -84,22 +84,56 @@ object CommandSafety {
     }
 
     private fun inspectSegment(tokens: List<String>): String? {
-        var index = 0
-        // 处理前置重定向：> /dev/block/x
-        while (index < tokens.size) {
-            val token = tokens[index]
-            if (token == ">" || token == ">>" || token == "<") {
-                val target = tokens.getOrNull(index + 1) ?: return null
-                if (isBlockDevice(target)) return "写入块设备：$target"
-                index += 2
-            } else {
-                break
+        // 1) 任意位置的输出重定向到块设备
+        for (i in tokens.indices) {
+            val token = tokens[i]
+            if ((token == ">" || token == ">>") &&
+                    i + 1 < tokens.size &&
+                    isBlockDevice(tokens[i + 1])) {
+                return "写入块设备：${tokens[i + 1]}"
             }
+        }
+
+        // 2) 跳过提权/包装前缀（sudo、busybox、nohup…）
+        var index = 0
+        while (index < tokens.size) {
+            val name = tokens[index].substringAfterLast('/')
+            val isPrefix =
+                    name == "sudo" ||
+                            name == "doas" ||
+                            name == "nohup" ||
+                            name == "time" ||
+                            name == "nice" ||
+                            name == "busybox" ||
+                            name == "toybox" ||
+                            name == "env"
+            if (isPrefix || name.startsWith("-")) index++ else break
         }
         if (index >= tokens.size) return null
 
-        val program = tokens[index].substringAfterLast('/')
+        // 3) 前缀后面可能还夹着参数（sudo -u root rm …），向后找真正的危险程序
+        var program = tokens[index].substringAfterLast('/')
+        if (index > 0 && !isKnownProgram(program)) {
+            for (i in index until tokens.size) {
+                val name = tokens[i].substringAfterLast('/')
+                if (isKnownProgram(name)) {
+                    index = i
+                    program = name
+                    break
+                }
+            }
+        }
         val args = tokens.subList(index + 1, tokens.size)
+
+        // 4) 穿透 shell 包装：su -c "…" / sh -c "…"
+        if (program == "su" || program == "sh" || program == "bash" || program == "ash") {
+            val position = args.indexOf("-c")
+            return if (position >= 0 && position + 1 < args.size) {
+                catastrophicReason(args[position + 1])
+            } else {
+                null
+            }
+        }
 
         return when (program) {
             "rm" -> checkRm(args)
@@ -107,6 +141,25 @@ object CommandSafety {
             "find" -> checkFind(args)
             "mkfs", "mke2fs", "wipefs", "fdisk", "sgdisk", "parted" -> "改写磁盘或分区：$program"
             else -> if (program.startsWith("mkfs.")) "格式化分区：$program" else null
+        }
+    }
+
+    private fun isKnownProgram(name: String): Boolean {
+        return when (name) {
+            "rm",
+            "dd",
+            "find",
+            "mkfs",
+            "mke2fs",
+            "wipefs",
+            "fdisk",
+            "sgdisk",
+            "parted",
+            "su",
+            "sh",
+            "bash",
+            "ash" -> true
+            else -> name.startsWith("mkfs.")
         }
     }
 
