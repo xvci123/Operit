@@ -17,8 +17,12 @@ object ShellGuard {
 
     private const val TAG = "ShellGuard"
 
-    /** 单条命令默认超时：30 秒。 */
-    const val DEFAULT_TIMEOUT_MS = 30_000L
+    /**
+     * 单条命令默认超时。
+     * **0 = 不限时**（用户明确决定：命令不设时间限制）。
+     * 需要限时的调用方自行传值即可，执行器只在 > 0 时才挂看门狗。
+     */
+    const val DEFAULT_TIMEOUT_MS = 0L
 
     /** 单条输出流上限：4M 字符（约 4 MB 文本）。 */
     const val MAX_OUTPUT_CHARS = 4 * 1024 * 1024

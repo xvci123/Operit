@@ -243,12 +243,14 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                     // Hermes: 超时看门狗。原实现 waitFor/readText 会无限期阻塞，
                     // 一条 `logcat` 就能把 Shizuku 通道永久占死。
                     val directHandle = process
-                    watchdog =
-                            launch {
-                                delay(ShellGuard.DEFAULT_TIMEOUT_MS)
-                                timedOut = true
-                                ShellGuard.destroyQuietly(directHandle)
-                            }
+                    if (ShellGuard.DEFAULT_TIMEOUT_MS > 0L) {
+                        watchdog =
+                                launch {
+                                    delay(ShellGuard.DEFAULT_TIMEOUT_MS)
+                                    timedOut = true
+                                    ShellGuard.destroyQuietly(directHandle)
+                                }
+                    }
 
                     // 将ParcelFileDescriptor转换为InputStream
                     val processClass = process::class.java
@@ -385,12 +387,14 @@ class DebuggerShellExecutor(private val context: Context) : ShellExecutor {
                                     )
 
                     // Hermes: 超时看门狗（后台命令不挂，见下方 isBackground 分支）
-                    watchdog =
-                            launch {
-                                delay(ShellGuard.DEFAULT_TIMEOUT_MS)
-                                timedOut = true
-                                ShellGuard.destroyQuietly(process)
-                            }
+                    if (ShellGuard.DEFAULT_TIMEOUT_MS > 0L) {
+                        watchdog =
+                                launch {
+                                    delay(ShellGuard.DEFAULT_TIMEOUT_MS)
+                                    timedOut = true
+                                    ShellGuard.destroyQuietly(process)
+                                }
+                    }
                     // 处理输入输出流
                     val processClass = process::class.java
                     val inputStream =
