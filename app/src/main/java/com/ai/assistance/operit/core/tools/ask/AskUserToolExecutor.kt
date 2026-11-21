@@ -2,7 +2,7 @@ package com.ai.assistance.operit.core.tools.ask
 
 import com.ai.assistance.operit.core.tools.ToolExecutor
 import com.ai.assistance.operit.data.model.AITool
-import com.ai.assistance.operit.data.model.StringResultData
+import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.data.model.ToolResult
 import com.ai.assistance.operit.data.model.ToolValidationResult
 import kotlinx.coroutines.runBlocking
