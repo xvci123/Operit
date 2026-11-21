@@ -1,0 +1,30 @@
+name: MeasureAPK
+
+on:
+  workflow_dispatch:
+    inputs:
+      src_run_id:
+        description: 'source run id owning the artifact'
+        required: true
+        default: '44774084376'
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.src_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: art
+      - name: Inventory
+        run: |
+          echo "########## FILES ##########"
+          find art -type f -exec ls -l {} \; | awk '{printf "%12d %s\n", $5, $9}' | sort -nr
+          echo "########## APK CONTENTS ##########"
+          find art -type f \( -name '*.apk' -o -name '*.aab' \) | while read -r f; do
+            echo "===== $f ($(stat -c%s "$f") bytes) ====="
+            unzip -l "$f" | awk 'NR>3 && NF>=4 {print $1, $4}' | sort -nr | head -40
+            echo "----- BY TOP DIRECTORY -----"
+            unzip -l "$f" | awk 'NR>3 && NF>=4 {split($4,a,"/"); s[a[1]]+=$1} END {for (k in s) printf "%12d %s\n", s[k], k}' | sort -nr | head -25
+          done
