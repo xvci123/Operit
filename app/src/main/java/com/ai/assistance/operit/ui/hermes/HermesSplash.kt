@@ -1,28 +1,23 @@
 package com.ai.assistance.operit.ui.hermes
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -37,82 +32,78 @@ import com.ai.assistance.operit.R
 import kotlin.math.abs
 
 /**
- * Hermes 启动动画（P5②，冷启动 2 秒）。
+ * Hermes 启动动画（冷启动 2 秒）。定案见 `Hermes-启动动画-定案.md`。
  *
- * 定案见 `Hermes-启动动画-定案.md`，这里是真机版落地：
- *  - 纯黑蓝底 `#070A12`（和聊天页一致）
- *  - 一道白色斜光从左上扫到右下（50ms 起，950ms 前扫完）
- *  - 鲸鱼 350→900ms 淡入
- *  - 900→1300ms DEEPSEEK 逐字翻转落下；1340→1700ms 换成 HARNESS 逐字翻入
- *  - 1700→2000ms 整体淡出，然后回调 onFinished
+ * ## 为什么这一版整个重写
  *
- * 为什么不做模糊：这台机器是 Android 11（API 30），Compose 的 RenderEffect 模糊要 31。
- * 所以光的边缘靠**渐变透明度**软化，不依赖模糊。
+ * 上一版把动画时钟当普通 state 在**组合阶段**读（`val now = clock.value * 2000`），
+ * 结果每一帧都重组整棵树：8 个字母的 Text、渐变背景、鲸鱼 Image 全部重新组合一遍，
+ * 真机上就是"卡顿抽帧"。
  *
- * 为什么做成覆盖层而不是独立 Activity：覆盖层覆盖在已经布局好的主界面上，
- * 2 秒后直接撤掉，不多一次 Activity 跳转，也不会闪白屏。
+ * **这不是 PNG 的锅，也不是"代码画 vs 贴图"的区别**——卡的是重组。
+ * 用 Canvas 每帧重绘同样有成本，关键永远是"别在组合阶段读动画值"。
+ *
+ * 这一版：
+ *  - 自己用 `withFrameNanos` 跑帧循环，把毫秒数写进 [mutableFloatStateOf]
+ *  - **所有动画值只在 `graphicsLayer {}` 里读**（绘制阶段），组合阶段一次都不读
+ *  - 每帧只更新图层属性（alpha / translationY / rotationY / translationX），
+ *    不重组、不重新测量、不重新排版
+ *
+ * 时间轴：光 50→950ms；鲸鱼 240→980ms 浮上来；DEEPSEEK 880→1300ms；
+ * HARNESS 1340→1700ms；整体 1700→2000ms 淡出。
  */
 @Composable
 fun HermesSplash(onFinished: () -> Unit) {
 
-    val totalMs = 2000f
-    // 一条线性时钟推进整段动画，所有元素都由它算出来，方便对着时间轴调
-    val clock = remember { Animatable(0f) }
+    // 已过去的毫秒数。只在 graphicsLayer 里读 → 不触发重组
+    val clock = remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
-        clock.animateTo(1f, animationSpec = tween(durationMillis = totalMs.toInt(), easing = LinearEasing))
+        val startNanos = withFrameNanos { it }
+        while (true) {
+            val frameNanos = withFrameNanos { it }
+            val elapsedMs = (frameNanos - startNanos) / 1_000_000f
+            clock.floatValue = elapsedMs
+            if (elapsedMs >= TOTAL_MS) break
+        }
         onFinished()
     }
 
-    val now = clock.value * totalMs
-
-    // 鲸鱼是"从下方浮上来"，不是原地淡入：位移 + 透明度 + 轻微放大一起做，
-    // 三者用同一条 ease-out，才不会出现"先出现再跳一下"的割裂感
-    val whaleRise = easeOutCubic(ramp(now, 240f, 980f, 0f, 1f))
-    val whaleAlpha = 0.94f * whaleRise
-    val whaleScale = 0.93f + 0.07f * whaleRise
-    val overlayAlpha = 1f - ramp(now, 1700f, 2000f, 0f, 1f)
-    val deepseekAlpha = 1f - ramp(now, 1340f, 1560f, 0f, 1f)
-
-    BoxWithConstraints(
+    Box(
             modifier =
                     Modifier.fillMaxSize()
                             .background(Color(0xFF070A12))
-                            .graphicsLayer { alpha = overlayAlpha }
+                            .graphicsLayer { alpha = 1f - ramp(clock.floatValue, 1700f, 2000f) }
     ) {
-        val bandWidth = maxWidth * 0.42f
-        val travelStart = -bandWidth
-        val travelEnd = maxWidth + bandWidth * 0.6f
-        val sweep = ramp(now, 50f, 950f, 0f, 1f)
-        val bandX = travelStart + (travelEnd - travelStart) * sweep
-        // 中间最亮、两端淡出，扫到边缘时自然消失
-        val bandAlpha = 0.85f * (1f - abs(sweep - 0.5f) * 1.6f).coerceIn(0f, 1f)
+        // ---------- 斜光：从左上扫到右下 ----------
+        Box(
+                modifier =
+                        Modifier.fillMaxSize()
+                                .graphicsLayer {
+                                    val p = ramp(clock.floatValue, 50f, 950f)
+                                    val w = size.width
+                                    val bandW = w * 0.42f
+                                    // 从完全在左侧之外，扫到完全在右下角之外
+                                    translationX = -bandW + (w + bandW * 1.9f) * p
+                                    // 中间最亮、两端淡出，扫到边缘自然收掉
+                                    alpha = 0.9f * (1f - abs(p - 0.5f) * 1.7f).coerceIn(0f, 1f)
+                                    rotationZ = 18f
+                                    blendMode = BlendMode.Screen
+                                }
+                                .background(
+                                        Brush.horizontalGradient(
+                                                listOf(
+                                                        Color.Transparent,
+                                                        Color.White.copy(alpha = 0.05f),
+                                                        Color.White.copy(alpha = 0.62f),
+                                                        Color.White.copy(alpha = 0.05f),
+                                                        Color.Transparent
+                                                )
+                                        )
+                                )
+        )
 
-        if (bandAlpha > 0.01f) {
-            Box(
-                    modifier =
-                            Modifier.offset(x = bandX)
-                                    .fillMaxHeight()
-                                    .width(bandWidth)
-                                    .rotate(18f)
-                                    .graphicsLayer {
-                                        blendMode = BlendMode.Screen
-                                        alpha = bandAlpha
-                                    }
-                                    .background(
-                                            Brush.horizontalGradient(
-                                                    listOf(
-                                                            Color.Transparent,
-                                                            Color.White.copy(alpha = 0.05f),
-                                                            Color.White.copy(alpha = 0.55f),
-                                                            Color.White.copy(alpha = 0.05f),
-                                                            Color.Transparent
-                                                    )
-                                            )
-                                    )
-            )
-        }
-
+        // ---------- 鲸鱼 + 品牌字 ----------
         Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -124,50 +115,58 @@ fun HermesSplash(onFinished: () -> Unit) {
                     contentScale = ContentScale.Fit,
                     modifier =
                             Modifier.size(148.dp).graphicsLayer {
-                                alpha = whaleAlpha
-                                translationY = 46.dp.toPx() * (1f - whaleRise)
-                                scaleX = whaleScale
-                                scaleY = whaleScale
+                                // 从下方浮上来：位移 + 透明度 + 轻微放大，同一条 ease-out
+                                val rise = easeOutCubic(ramp(clock.floatValue, 240f, 980f))
+                                alpha = 0.95f * rise
+                                translationY = 46.dp.toPx() * (1f - rise)
+                                scaleX = 0.93f + 0.07f * rise
+                                scaleY = scaleX
                             }
             )
 
             Box(modifier = Modifier.padding(top = 28.dp)) {
+                // DEEPSEEK 逐字翻转落下，1340→1560ms 让位给 HARNESS
                 FlipWord(
                         word = "DEEPSEEK",
-                        now = now,
+                        clock = clock,
                         startMs = 880f,
                         staggerMs = 36f,
-                        alphaAll = deepseekAlpha * ramp(now, 880f, 980f, 0f, 1f)
+                        fadeOutFrom = 1340f,
+                        fadeOutTo = 1560f
                 )
+                // HARNESS 逐字翻入
                 FlipWord(
                         word = "HARNESS",
-                        now = now,
+                        clock = clock,
                         startMs = 1340f,
                         staggerMs = 40f,
-                        alphaAll = ramp(now, 1340f, 1420f, 0f, 1f)
+                        fadeOutFrom = Float.MAX_VALUE,
+                        fadeOutTo = Float.MAX_VALUE
                 )
             }
         }
     }
 }
 
+private const val TOTAL_MS = 2000f
+
 /**
- * 逐字翻转：`rotationY` 从 88 度转到 0，配合 cameraDistance 做出"卡片立起来又倒下"的观感，
- * 每个字比前一个字晚 [staggerMs]，形成波浪。
+ * 逐字翻转。
+ *
+ * [clock] 传的是 state 本身而不是值——传值会让组合阶段读它，每帧重组一次；
+ * 传 state 之后每个字母的文字内容整段动画只组合一次。
  */
 @Composable
 private fun FlipWord(
         word: String,
-        now: Float,
+        clock: State<Float>,
         startMs: Float,
         staggerMs: Float,
-        alphaAll: Float
+        fadeOutFrom: Float,
+        fadeOutTo: Float
 ) {
-    if (alphaAll <= 0.01f) return
     Row {
         word.forEachIndexed { index, ch ->
-            val local = ((now - startMs - index * staggerMs) / 260f).coerceIn(0f, 1f)
-            val eased = easeOutCubic(local)
             Text(
                     text = ch.toString(),
                     style =
@@ -179,20 +178,26 @@ private fun FlipWord(
                             ),
                     modifier =
                             Modifier.graphicsLayer {
+                                val now = clock.value
+                                val local =
+                                        ((now - startMs - index * staggerMs) / 240f).coerceIn(0f, 1f)
+                                val eased = easeOutCubic(local)
                                 rotationY = (1f - eased) * 88f
                                 cameraDistance = 14f * density
-                                alpha = eased * alphaAll
+                                val globalFade =
+                                        if (fadeOutTo <= fadeOutFrom) 1f
+                                        else 1f - ramp(now, fadeOutFrom, fadeOutTo)
+                                alpha = eased * globalFade
                             }
             )
         }
     }
 }
 
-/** 把 [now] 线性映射到 [outFrom]..[outTo]，区间外夹住。 */
-private fun ramp(now: Float, from: Float, to: Float, outFrom: Float, outTo: Float): Float {
-    if (to <= from) return outTo
-    val p = ((now - from) / (to - from)).coerceIn(0f, 1f)
-    return outFrom + (outTo - outFrom) * p
+/** 把 [now] 线性映射到 0..1，区间外夹住。 */
+private fun ramp(now: Float, from: Float, to: Float): Float {
+    if (to <= from) return if (now >= to) 1f else 0f
+    return ((now - from) / (to - from)).coerceIn(0f, 1f)
 }
 
 private fun easeOutCubic(x: Float): Float {

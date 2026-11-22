@@ -207,7 +207,9 @@ fun OperitTheme(content: @Composable () -> Unit) {
                     statusBarTransparent -> Color.Transparent.toArgb()
                     useBackgroundImage && backgroundImageUri != null -> Color.Transparent.toArgb()  // 有背景时透明
                     useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
-                    else -> colorScheme.primary.toArgb()
+                    // Hermes：默认跟背景走。原来是 colorScheme.primary（一条亮蓝横在顶上），
+                    // 和我们"蓝只留给控件"的规范冲突。图标颜色下面会按亮度自动算。
+                    else -> colorScheme.background.toArgb()
                 }
                 window.statusBarColor = statusBarColor
 

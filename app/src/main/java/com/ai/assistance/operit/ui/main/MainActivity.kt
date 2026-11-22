@@ -189,13 +189,8 @@ class MainActivity : ComponentActivity() {
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
 
-        // Hermes：状态栏跟着黑蓝底走，图标用白的（否则系统默认浅色状态栏上是一整条淡蓝，
-        // 和启动动画、聊天页的黑底接不上）
-        runCatching {
-            window.statusBarColor = com.ai.assistance.operit.core.hermes.HermesSkin.BG
-            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-                    .isAppearanceLightStatusBars = false
-        }.onFailure { AppLogger.w(TAG, "设置状态栏颜色失败", it) }
+        // 状态栏配色统一在 ui/theme/Theme.kt 的 SideEffect 里按主题色算，
+        // 这里不要再设一遍（会被那边的 SideEffect 覆盖，两处来源只会互相打架）。
 
         // Handle the intent that started the activity
         handleIntent(intent)
