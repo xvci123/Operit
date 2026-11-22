@@ -618,10 +618,25 @@ private fun generateDarkColorScheme(
             onSecondary = onSecondary,
             secondaryContainer = secondaryContainer,
             onSecondaryContainer = onSecondaryContainer,
-        // Ensure other colors are consistent with a dark theme
-        onSurface = Color.White,
-        onSurfaceVariant = Color.White.copy(alpha = 0.7f),
-        onBackground = Color.White
+        // ---- Hermes：底色与表面角色改成 Operit2 的实测值 ----
+        // 之前这里只改 primary/secondary，background/surface 一直是 Material 默认的紫灰，
+        // 于是"换了主色但整屏还是旧底色"。这几个角色是全局底色，改这里才真的换皮。
+        background = HermesTokens.Palette.bg,
+        onBackground = HermesTokens.Palette.text,
+        surface = HermesTokens.Palette.surface,
+        onSurface = HermesTokens.Palette.text,
+        surfaceVariant = HermesTokens.Palette.surfaceHigh,
+        onSurfaceVariant = HermesTokens.Palette.textSecondary,
+        surfaceContainerLowest = HermesTokens.Palette.bg,
+        surfaceContainerLow = HermesTokens.Palette.surface,
+        surfaceContainer = HermesTokens.Palette.surface,
+        surfaceContainerHigh = HermesTokens.Palette.surfaceHigh,
+        surfaceContainerHighest = HermesTokens.Palette.surfaceHigh,
+        inverseSurface = HermesTokens.Palette.text,
+        inverseOnSurface = HermesTokens.Palette.bg,
+        outline = HermesTokens.Palette.outline,
+        outlineVariant = HermesTokens.Palette.outline,
+        error = HermesTokens.Palette.danger,
     )
 }
 
