@@ -49,7 +49,7 @@ import kotlin.math.abs
  * 为什么不做模糊：这台机器是 Android 11（API 30），Compose 的 RenderEffect 模糊要 31。
  * 所以光的边缘靠**渐变透明度**软化，不依赖模糊。
  *
- * 为什么做成覆盖层而不是独立 Activity：覆盖层盖在已经布局好的主界面上，
+ * 为什么做成覆盖层而不是独立 Activity：覆盖层覆盖在已经布局好的主界面上，
  * 2 秒后直接撤掉，不多一次 Activity 跳转，也不会闪白屏。
  */
 @Composable
