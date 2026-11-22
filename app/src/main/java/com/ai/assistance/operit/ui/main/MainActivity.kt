@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity() {
     private var showOrientationChangeDialog by mutableStateOf(false)
     /** Hermes：冷启动动画是否已播过（Activity 存活期内只播一次，进程重启自然重置）。 */
     private var hermesSplashDone by mutableStateOf(false)
+    /** 协议/配置完成前不播放“飞向聊天页左上角”，避免承诺一个尚不存在的目的地。 */
+    private var hermesOnboardingFinished by mutableStateOf(false)
 
     private var lastOrientation: Int? = null
 
@@ -187,7 +189,9 @@ class MainActivity : ComponentActivity() {
         AppLogger.d(TAG, "onCreate: Android SDK version: ${Build.VERSION.SDK_INT}")
 
         // Set window background to solid color to prevent system theme leaking through
-        window.setBackgroundDrawableResource(android.R.color.black)
+        window.setBackgroundDrawableResource(R.drawable.hermes_splash_window)
+        window.statusBarColor = android.graphics.Color.rgb(13, 14, 16)
+        window.navigationBarColor = android.graphics.Color.rgb(13, 14, 16)
 
         // 状态栏配色统一在 ui/theme/Theme.kt 的 SideEffect 里按主题色算，
         // 这里不要再设一遍（会被那边的 SideEffect 覆盖，两处来源只会互相打架）。
@@ -213,6 +217,9 @@ class MainActivity : ComponentActivity() {
             AppLogger.d(TAG, "用户跳过了插件加载过程")
             Toast.makeText(this, getString(R.string.plugin_loading_skipped), Toast.LENGTH_SHORT).show()
         }
+
+        // 在 Compose 首帧前确定目的地，避免新用户先按“聊天页”播放飞行再跳配置。
+        checkPermissionLevelSet()
 
         // 设置初始界面
         setAppContent()
@@ -565,6 +572,7 @@ class MainActivity : ComponentActivity() {
         val permissionLevel = androidPermissionPreferences.getPreferredPermissionLevel()
         AppLogger.d(TAG, "当前权限级别: $permissionLevel")
         showPermissionGuide = permissionLevel == null
+        hermesOnboardingFinished = permissionLevel != null
         AppLogger.d(
                 TAG,
                 "权限级别检查: 已设置=${!showPermissionGuide}, 将${if(showPermissionGuide) "" else "不"}显示权限引导界面"
@@ -639,6 +647,7 @@ class MainActivity : ComponentActivity() {
                             PermissionGuideScreen(
                                     onComplete = {
                                         showPermissionGuide = false
+                                        hermesOnboardingFinished = true
                                         // 权限设置完成后，启动插件加载并更新内容
                                         startPluginLoading()
                                         setAppContent()
@@ -711,7 +720,10 @@ class MainActivity : ComponentActivity() {
                     // Hermes：冷启动动画。放在最后 → 盖在所有内容之上（包括插件加载页），
                     // 2 秒后自己撤掉，主界面早就在底下布局好了，不会有跳转闪烁。
                     if (!hermesSplashDone) {
-                        HermesSplash(onFinished = { hermesSplashDone = true })
+                        HermesSplash(
+                                flyToHeader = hermesOnboardingFinished,
+                                onFinished = { hermesSplashDone = true }
+                        )
                     }
                 }
 

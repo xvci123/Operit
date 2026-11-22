@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 首帧之前由系统直接显示，避免应用初始化期间长时间纯黑。尺寸固定，不使用 512px 固有尺寸。 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/hermes_background" />
+    <item
+        android:width="148dp"
+        android:height="148dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/whale_alpha"
+            android:gravity="center" />
+    </item>
+</layer-list>

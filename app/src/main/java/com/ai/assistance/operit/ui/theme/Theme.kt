@@ -210,13 +210,14 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 insetsController?.show(WindowInsetsCompat.Type.statusBars())
                 
                 // 状态栏颜色和图标颜色控制
-                val statusBarColor = when {
+                val statusBarColor = if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) {
+                    // Hermes 皮肤只有一条来源；旧版保存的自定义状态栏颜色不能覆盖皮肤。
+                    colorScheme.background.toArgb()
+                } else when {
                     statusBarTransparent -> Color.Transparent.toArgb()
                     useBackgroundImage && backgroundImageUri != null -> Color.Transparent.toArgb()  // 有背景时透明
                     useCustomStatusBarColor && customStatusBarColorValue != null -> customStatusBarColorValue!!.toInt()
-                    // Hermes：默认跟背景走。原来是 colorScheme.primary（一条亮蓝横在顶上），
-                    // 和我们"蓝只留给控件"的规范冲突。图标颜色下面会按亮度自动算。
-                    else -> colorScheme.background.toArgb()
+                    else -> colorScheme.primary.toArgb()
                 }
                 window.statusBarColor = statusBarColor
 

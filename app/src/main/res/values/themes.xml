@@ -11,6 +11,13 @@
         <item name="colorOnSecondary">@color/black</item>
         <!-- Declare support for drawing into the status bar / display cutout area. -->
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Hermes：系统启动窗与 Compose 使用同一底色，状态栏不再沿用紫色的 Material 默认值。 -->
+        <item name="android:windowBackground">@drawable/hermes_splash_window</item>
+        <item name="android:statusBarColor">@color/hermes_background</item>
+        <item name="android:navigationBarColor">@color/hermes_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
         <!-- Customize your theme here. -->
         
     </style>

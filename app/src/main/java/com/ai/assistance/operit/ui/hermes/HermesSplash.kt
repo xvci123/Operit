@@ -37,169 +37,129 @@ import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
 
 /**
- * Hermes 启动动画（冷启动，2 秒）。
+ * Hermes 冷启动动画。系统启动窗负责首帧之前的静态鲸鱼，本层负责接管后的动效。
  *
- * 时间轴：
- * ```
- *   0 →  50ms   纯黑
- *  50 → 950ms   白光斜扫（整屏渐变，端点全透明，不存在矩形边/截断）
- * 950 →1500ms   四周黑色向鲸鱼汇聚（径向收拢，cubic ease-out）
- * 1500→1980ms   鲸鱼飞向左上角鲸鱼图标位置，同时缩到 24dp，贝塞尔缓入缓出
- * 1900→2000ms   覆盖层淡出，与主界面无缝衔接（主界面左上角就是同一只鲸鱼、同一位置同一尺寸）
- * ```
+ * [flyToHeader] 只有即将进入聊天主界面时才为 true。协议或权限配置尚未完成时，
+ * 鲸鱼原地淡出，不会飞向一个尚未出现的聊天顶栏。
  *
- * ## 性能约定（上一版踩过的坑）
- * 动画时钟只在 `graphicsLayer {}` / `drawBehind {}` 里读，**组合阶段一次都不读**，
- * 否则每帧重组整棵树，真机就是"卡顿抽帧"。`FlipWord` 传 `State<Float>` 而不是值，
- * 就是为了不让组合阶段读它。
+ * 所有动画值只在 drawBehind / graphicsLayer 中读取，避免逐帧重组。
  */
 @Composable
-fun HermesSplash(onFinished: () -> Unit) {
-
+fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
     val clock = remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         val startNanos = withFrameNanos { it }
         while (true) {
-            val frameNanos = withFrameNanos { it }
-            val elapsedMs = (frameNanos - startNanos) / 1_000_000f
+            val elapsedMs = (withFrameNanos { it } - startNanos) / 1_000_000f
             clock.floatValue = elapsedMs
             if (elapsedMs >= TOTAL_MS) break
         }
         onFinished()
     }
 
-    // 状态栏高度：主界面左上角图标在 appBar 里往下让了状态栏高度，
-    // 鲸鱼最后要停在同一处，必须算进去，否则接缝会跳一下
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     BoxWithConstraints(
-            modifier =
-                    Modifier.fillMaxSize()
-                            .background(HermesTokens.Palette.bg)
-                            .graphicsLayer { alpha = 1f - ramp(clock.floatValue, 1900f, 2000f) }
+        modifier = Modifier
+            .fillMaxSize()
+            .background(HermesTokens.Palette.bg)
+            .graphicsLayer { alpha = 1f - ramp(clock.floatValue, 2200f, TOTAL_MS) }
     ) {
-        // 鲸鱼静止时的中心（Column 居中，下方有文字，视觉中心略微上移）
         val whaleCenterX = maxWidth / 2
         val whaleCenterY = maxHeight / 2 - 32.dp
-        // 落点 = 主界面 TopAppBar 里鲸鱼图标的中心
         val targetX = 28.dp
         val targetY = statusTop + 32.dp
         val startSize = 148.dp
         val endSize = 24.dp
 
-        // ---------- 1) 白光斜扫 ----------
+        // 局部柔光，而不是覆盖全屏的白色渐变。任何一帧都不会把整屏刷白。
         Box(
-                modifier =
-                        Modifier.fillMaxSize().drawBehind {
-                            val p = ramp(clock.floatValue, 50f, 950f)
-                            if (p <= 0f || p >= 1f) return@drawBehind
-                            val w = size.width
-                            val h = size.height
-                            val bandW = w * 1.15f
-                            val cx = -bandW + (w + bandW * 2.2f) * p
-                            // 两层叠加：宽而淡打底 + 窄而亮主光，做出层次
-                            listOf(1.00f to 0.32f, 0.52f to 0.26f).forEach { (scale, peak) ->
-                                val half = bandW * 0.5f * scale
-                                drawRect(
-                                        brush =
-                                                Brush.linearGradient(
-                                                        colors =
-                                                                listOf(
-                                                                        Color.Transparent,
-                                                                        Color.White.copy(alpha = peak),
-                                                                        Color.Transparent
-                                                                ),
-                                                        start = Offset(cx - half, -h * 0.2f),
-                                                        end = Offset(cx + half, h * 1.2f)
-                                                )
-                                )
-                            }
-                        }
+            modifier = Modifier.fillMaxSize().drawBehind {
+                val now = clock.floatValue
+                val lightIn = ramp(now, 0f, 420f)
+                val lightOut = 1f - ramp(now, 850f, 1250f)
+                val strength = lightIn * lightOut
+                if (strength <= 0f) return@drawBehind
+                val center = Offset(size.width / 2f, size.height / 2f - 32.dp.toPx())
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.18f * strength),
+                            HermesTokens.Palette.primary.copy(alpha = 0.06f * strength),
+                            Color.Transparent
+                        ),
+                        center = center,
+                        radius = size.width * (0.22f + 0.25f * lightIn)
+                    ),
+                    center = center,
+                    radius = size.width * (0.22f + 0.25f * lightIn)
+                )
+
+                // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。
+                val gather = easeOutCubic(ramp(now, 900f, 1550f))
+                if (gather > 0f) {
+                    drawRect(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                HermesTokens.Palette.bg.copy(alpha = 0.45f * gather),
+                                HermesTokens.Palette.bg.copy(alpha = gather)
+                            ),
+                            center = center,
+                            radius = maxOf(size.width, size.height) * (0.95f - 0.45f * gather)
+                        )
+                    )
+                }
+            }
         )
 
-        // ---------- 2) 黑色向鲸鱼汇聚 ----------
-        // 整屏铺一层"背景色的径向渐变"，中心透明露出鲸鱼，半径由大收小。
-        // 用渐变而不是遮罩圈，边缘自然过渡，不会有硬边或断层。
-        Box(
-                modifier =
-                        Modifier.fillMaxSize().drawBehind {
-                            val raw = ramp(clock.floatValue, 950f, 1500f)
-                            if (raw <= 0f) return@drawBehind
-                            val gathered = easeOutCubic(raw)
-                            val w = size.width
-                            val h = size.height
-                            val maxDim = maxOf(w, h)
-                            val radius = maxDim * (1.25f - 0.95f * gathered)
-                            val center = Offset(w / 2f, h / 2f - 32.dp.toPx())
-                            drawRect(
-                                    brush =
-                                            Brush.radialGradient(
-                                                    colors =
-                                                            listOf(
-                                                                    Color.Transparent,
-                                                                    HermesTokens.Palette.bg.copy(alpha = 0.65f),
-                                                                    HermesTokens.Palette.bg
-                                                            ),
-                                                    center = center,
-                                                    radius = radius
-                                            )
-                            )
-                        }
-        )
-
-        // ---------- 3) 鲸鱼 + 品牌字 ----------
         Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Image(
-                    painter = painterResource(id = R.drawable.whale_alpha),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier =
-                            Modifier.size(startSize).graphicsLayer {
-                                val now = clock.floatValue
-                                // 浮入：位移 + 透明度 + 轻微放大，同一条 ease-out
-                                val rise = easeOutCubic(ramp(now, 240f, 980f))
-                                // 飞向左上角：贝塞尔缓入缓出，不是匀速直线
-                                val fly = easeInOutCubic(ramp(now, 1500f, 1980f))
-                                alpha = 0.95f * rise
-                                translationX = (targetX - whaleCenterX).toPx() * fly
-                                translationY =
-                                        (targetY - whaleCenterY).toPx() * fly +
-                                                46.dp.toPx() * (1f - rise) * (1f - fly)
-                                val shrink = 1f - (1f - (endSize / startSize)) * fly
-                                scaleX = (0.93f + 0.07f * rise) * shrink
-                                scaleY = scaleX
-                            }
+                painter = painterResource(id = R.drawable.whale_alpha),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(startSize).graphicsLayer {
+                    val now = clock.floatValue
+                    val rise = easeOutCubic(ramp(now, 0f, 650f))
+                    val fly = if (flyToHeader) {
+                        easeInOutCubic(ramp(now, 1650f, 2150f))
+                    } else {
+                        0f
+                    }
+                    alpha = 0.95f * (0.35f + 0.65f * rise)
+                    translationX = (targetX - whaleCenterX).toPx() * fly
+                    translationY = (targetY - whaleCenterY).toPx() * fly +
+                        24.dp.toPx() * (1f - rise) * (1f - fly)
+                    val shrink = 1f - (1f - endSize / startSize) * fly
+                    scaleX = (0.96f + 0.04f * rise) * shrink
+                    scaleY = scaleX
+                }
             )
 
             Box(modifier = Modifier.padding(top = 28.dp)) {
-                // 品牌字：鲸鱼起飞前必须收掉，否则会跟着飞出屏幕
                 Box(
-                        modifier =
-                                Modifier.graphicsLayer {
-                                    alpha = 1f - ramp(clock.floatValue, 1400f, 1560f)
-                                }
+                    modifier = Modifier.graphicsLayer {
+                        alpha = 1f - ramp(clock.floatValue, 1550f, 1770f)
+                    }
                 ) {
                     FlipWord(
-                            word = "DEEPSEEK",
-                            clock = clock,
-                            startMs = 880f,
-                            staggerMs = 36f,
-                            fadeOutFrom = 1340f,
-                            fadeOutTo = 1560f
+                        word = "DEEPSEEK",
+                        clock = clock,
+                        startMs = 520f,
+                        staggerMs = 34f,
+                        hollow = false
                     )
                     FlipWord(
-                            word = "HARNESS",
-                            clock = clock,
-                            startMs = 1340f,
-                            staggerMs = 40f,
-                            fadeOutFrom = Float.MAX_VALUE,
-                            fadeOutTo = Float.MAX_VALUE,
-                            hollow = true
+                        word = "HARNESS",
+                        clock = clock,
+                        startMs = 1050f,
+                        staggerMs = 38f,
+                        hollow = true
                     )
                 }
             }
@@ -207,55 +167,41 @@ fun HermesSplash(onFinished: () -> Unit) {
     }
 }
 
-private const val TOTAL_MS = 2000f
+private const val TOTAL_MS = 2400f
 
-/**
- * 逐字翻转。
- *
- * [clock] 传 state 本身而不是值：传值会在组合阶段读它，每帧重组一次。
- */
+/** [clock] 传 State 本身，组合阶段不读值。两个词错峰出现，并共享足够的可见窗口。 */
 @Composable
 private fun FlipWord(
-        word: String,
-        clock: State<Float>,
-        startMs: Float,
-        staggerMs: Float,
-        fadeOutFrom: Float,
-        fadeOutTo: Float,
-        /** true = 只描边不填充（镂空字）。 */
-        hollow: Boolean = false
+    word: String,
+    clock: State<Float>,
+    startMs: Float,
+    staggerMs: Float,
+    hollow: Boolean
 ) {
     Row {
         word.forEachIndexed { index, ch ->
             Text(
-                    text = ch.toString(),
-                    style =
-                            TextStyle(
-                                    color = HermesTokens.Palette.text,
-                                    fontSize = 30.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 3.sp,
-                                    drawStyle = if (hollow) Stroke(width = 1.6f) else null
-                            ),
-                    modifier =
-                            Modifier.graphicsLayer {
-                                val now = clock.value
-                                val local =
-                                        ((now - startMs - index * staggerMs) / 240f).coerceIn(0f, 1f)
-                                val eased = easeOutCubic(local)
-                                rotationY = (1f - eased) * 88f
-                                cameraDistance = 14f * density
-                                val globalFade =
-                                        if (fadeOutTo <= fadeOutFrom) 1f
-                                        else 1f - ramp(now, fadeOutFrom, fadeOutTo)
-                                alpha = eased * globalFade
-                            }
+                text = ch.toString(),
+                style = TextStyle(
+                    color = HermesTokens.Palette.text,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 3.sp,
+                    drawStyle = if (hollow) Stroke(width = 1.6f) else null
+                ),
+                modifier = Modifier.graphicsLayer {
+                    val local = ((clock.value - startMs - index * staggerMs) / 240f)
+                        .coerceIn(0f, 1f)
+                    val eased = easeOutCubic(local)
+                    rotationY = (1f - eased) * 88f
+                    cameraDistance = 14f * density
+                    alpha = eased
+                }
             )
         }
     }
 }
 
-/** 把 [now] 线性映射到 0..1，区间外夹住。 */
 private fun ramp(now: Float, from: Float, to: Float): Float {
     if (to <= from) return if (now >= to) 1f else 0f
     return ((now - from) / (to - from)).coerceIn(0f, 1f)
@@ -266,7 +212,6 @@ private fun easeOutCubic(x: Float): Float {
     return 1f - t * t * t
 }
 
-/** 缓入缓出（三次），用于飞行段：起步慢、中间快、落地稳。 */
 private fun easeInOutCubic(x: Float): Float {
     return if (x < 0.5f) 4f * x * x * x
     else 1f - ((-2f * x + 2f) * (-2f * x + 2f) * (-2f * x + 2f)) / 2f
