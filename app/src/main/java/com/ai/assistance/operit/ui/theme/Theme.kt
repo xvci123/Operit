@@ -149,12 +149,16 @@ fun OperitTheme(content: @Composable () -> Unit) {
 
     // 确定是否使用暗色主题
     val systemDarkTheme = isSystemInDarkTheme()
-    val darkTheme =
+    // Hermes：皮肤目前只有深色一套（黑蓝底 + Operit2 的暗色 token）。
+    // 浅色主题下 Material 会退回浅色文本/白底，和我们的 #0D0E10 token 撞成不可读，
+    // 所以这里强制深色。将来要做浅色皮肤，把 FORCE_DARK 关掉并补一套 light token 即可。
+    val userDarkTheme =
             if (useSystemTheme) {
                 systemDarkTheme
             } else {
                 themeMode == UserPreferencesManager.THEME_MODE_DARK
             }
+    val darkTheme = if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) true else userDarkTheme
 
     // Dynamic color is available on Android 12+
     val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S

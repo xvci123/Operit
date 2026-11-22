@@ -19,6 +19,15 @@ object HermesSkin {
 
     private const val TAG = "HermesSkin"
 
+    /**
+     * 强制深色。
+     *
+     * 皮肤只有深色一套：token 是 Operit2 的暗色值（底 #0D0E10），
+     * 一旦被切成浅色，Material 会给浅底+深字，和我们的 token 直接冲突。
+     * 将来做浅色皮肤时把这里改 false，并补一套 light token。
+     */
+    const val FORCE_DARK = true
+
     // 对齐 Operit2 主题源码里的真实色值（apps/flutter/app/lib/ui/theme/OperitTheme.dart）：
     // 底 #0D0E10、强调蓝 #3B82F6、主文字 #E8EAEF
     const val BG = 0xFF0D0E10.toInt()

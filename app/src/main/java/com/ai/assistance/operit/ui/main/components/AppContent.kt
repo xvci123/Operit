@@ -329,6 +329,16 @@ fun AppContent(
                                 }
                             }
                         ) {
+                            // Hermes：左上角改成鲸鱼图标（启动动画最后就是飞到这个位置、
+                            // 缩到同样大小，衔接才不会跳）。返回/平板侧栏仍用原图标。
+                            if (!canGoBack && !useTabletLayout) {
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = R.drawable.whale_alpha),
+                                    contentDescription = stringResource(id = R.string.menu),
+                                    modifier = Modifier.size(24.dp),
+                                    colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(appBarContentColor)
+                                )
+                            } else {
                             Icon(
                                 if (canGoBack) Icons.Default.ArrowBack
                                 else if (useTabletLayout)
@@ -346,6 +356,7 @@ fun AppContent(
                                 },
                                 tint = appBarContentColor
                             )
+                            }
                         }
                     },
                     actions = actions,

@@ -424,7 +424,10 @@ fun ChatArea(
         // Hermes：没有消息时不要留一片纯黑（看着像没加载出来）
         if (chatHistory.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                com.ai.assistance.operit.ui.hermes.HermesEmptyChat()
+                // 粒子鲸鱼：汇聚 1.5s → 停顿 1s → 拼成鲸鱼 → 弹动 → 文字浮出
+                com.ai.assistance.operit.ui.hermes.HermesParticleWhale(
+                        modifier = Modifier.fillMaxSize()
+                )
             }
         }
 
