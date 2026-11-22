@@ -66,8 +66,11 @@ fun HermesSplash(onFinished: () -> Unit) {
 
     val now = clock.value * totalMs
 
-    val whaleAlpha = ramp(now, 350f, 900f, 0f, 0.92f)
-    val whaleScale = 0.96f + 0.04f * ramp(now, 350f, 1100f, 0f, 1f)
+    // 鲸鱼是"从下方浮上来"，不是原地淡入：位移 + 透明度 + 轻微放大一起做，
+    // 三者用同一条 ease-out，才不会出现"先出现再跳一下"的割裂感
+    val whaleRise = easeOutCubic(ramp(now, 240f, 980f, 0f, 1f))
+    val whaleAlpha = 0.94f * whaleRise
+    val whaleScale = 0.93f + 0.07f * whaleRise
     val overlayAlpha = 1f - ramp(now, 1700f, 2000f, 0f, 1f)
     val deepseekAlpha = 1f - ramp(now, 1340f, 1560f, 0f, 1f)
 
@@ -122,6 +125,7 @@ fun HermesSplash(onFinished: () -> Unit) {
                     modifier =
                             Modifier.size(148.dp).graphicsLayer {
                                 alpha = whaleAlpha
+                                translationY = 46.dp.toPx() * (1f - whaleRise)
                                 scaleX = whaleScale
                                 scaleY = whaleScale
                             }
@@ -131,9 +135,9 @@ fun HermesSplash(onFinished: () -> Unit) {
                 FlipWord(
                         word = "DEEPSEEK",
                         now = now,
-                        startMs = 900f,
-                        staggerMs = 40f,
-                        alphaAll = deepseekAlpha * ramp(now, 900f, 1000f, 0f, 1f)
+                        startMs = 880f,
+                        staggerMs = 36f,
+                        alphaAll = deepseekAlpha * ramp(now, 880f, 980f, 0f, 1f)
                 )
                 FlipWord(
                         word = "HARNESS",

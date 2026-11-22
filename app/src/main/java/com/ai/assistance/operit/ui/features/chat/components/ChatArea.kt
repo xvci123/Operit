@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -420,6 +421,13 @@ fun ChatArea(
                     viewportHeightPx = coordinates.size.height
                 },
     ) {
+        // Hermes：没有消息时不要留一片纯黑（看着像没加载出来）
+        if (chatHistory.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                com.ai.assistance.operit.ui.hermes.HermesEmptyChat()
+            }
+        }
+
         Column(
             modifier =
                 Modifier

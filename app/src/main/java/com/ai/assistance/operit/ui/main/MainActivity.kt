@@ -189,6 +189,14 @@ class MainActivity : ComponentActivity() {
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(android.R.color.black)
 
+        // Hermes：状态栏跟着黑蓝底走，图标用白的（否则系统默认浅色状态栏上是一整条淡蓝，
+        // 和启动动画、聊天页的黑底接不上）
+        runCatching {
+            window.statusBarColor = com.ai.assistance.operit.core.hermes.HermesSkin.BG
+            androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                    .isAppearanceLightStatusBars = false
+        }.onFailure { AppLogger.w(TAG, "设置状态栏颜色失败", it) }
+
         // Handle the intent that started the activity
         handleIntent(intent)
         restoreRuntimeTaskViewVisibilityIfNeeded()
@@ -403,7 +411,9 @@ class MainActivity : ComponentActivity() {
         // 初始化MCP服务器并启动插件
         // 轻微延迟让首帧 Compose 完成，避免启动阶段后台重任务立刻抢占导致掉帧
         lifecycleScope.launch {
-            delay(500)
+            // Hermes：启动动画占前 2 秒，这期间不要干重活（MCP 初始化会明显掉帧，
+            // 用户看到的就是"鲸鱼卡一下"。等动画播完再开始，动画就顺了）
+            delay(2200)
             pluginLoadingState.initializeMCPServer(this@MainActivity, lifecycleScope)
         }
     }

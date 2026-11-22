@@ -355,7 +355,8 @@ fun AppContent(
                         when {
                             toolbarTransparent -> Color.Transparent
                             useCustomAppBarColor && customAppBarColor != null -> Color(customAppBarColor)
-                            else -> MaterialTheme.colorScheme.primary
+                            // Hermes：顶部栏默认用背景黑（原来是 primary 蓝，一条亮蓝横在顶上太抢眼）
+                            else -> Color(com.ai.assistance.operit.core.hermes.HermesSkin.BG)
                         },
                         titleContentColor = appBarContentColor,
                         navigationIconContentColor = appBarContentColor,

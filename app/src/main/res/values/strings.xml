@@ -1785,6 +1785,7 @@
     <string name="copy_xml_source">复制 XML 源码</string>
     <string name="chat_hidden_user_message_placeholder">自动触发用户消息（内容已隐藏）</string>
     <string name="chat_hidden_user_message_badge">自动触发</string>
+    <string name="hermes_tagline">探索未至之境</string>
     <string name="info">信息</string>
     <string name="read_message">朗读消息</string>
     <string name="auto_read_message">自动朗读</string>
