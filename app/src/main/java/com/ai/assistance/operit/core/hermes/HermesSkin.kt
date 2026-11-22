@@ -19,10 +19,11 @@ object HermesSkin {
 
     private const val TAG = "HermesSkin"
 
-    // 取自总文档 B.2 的黑蓝调色板
-    const val BG = 0xFF070A12.toInt()
-    const val SURFACE = 0xFF111826.toInt()
-    const val PRIMARY = 0xFF4C8DFF.toInt()
+    // 对齐 Operit2 主题源码里的真实色值（apps/flutter/app/lib/ui/theme/OperitTheme.dart）：
+    // 底 #0D0E10、强调蓝 #3B82F6、主文字 #E8EAEF
+    const val BG = 0xFF0D0E10.toInt()
+    const val SURFACE = 0xFF161616.toInt()
+    const val PRIMARY = 0xFF3B82F6.toInt()
     const val PRIMARY_DEEP = 0xFF1E3A6E.toInt()
     const val ACCENT = 0xFF7BD3FF.toInt()
     const val TEXT = 0xFFE8EEF7.toInt()
@@ -30,8 +31,16 @@ object HermesSkin {
     const val DANGER = 0xFFE5534B.toInt()
     const val SUCCESS = 0xFF4CB782.toInt()
 
+    /**
+     * 种子版本。
+     *
+     * 换色板必须换版本号：老机器上 `skin_seeded` 早就写过，不换版本号新色值永远不会生效。
+     * v1 = 最初的黑蓝（#070A12 / #4C8DFF）；v2 = 对齐 Operit2 的 #0D0E10 / #3B82F6。
+     */
+    private const val SEED_VERSION = 2
+
     private fun marker(context: Context): File =
-            File(File(context.filesDir, "hermes"), "skin_seeded")
+            File(File(context.filesDir, "hermes"), "skin_seeded_v$SEED_VERSION")
 
     /** 幂等：需要写偏好时返回 true。调用方负责放到后台协程里（写偏好是 IO）。 */
     suspend fun seedIfNeeded(context: Context): Boolean {

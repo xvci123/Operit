@@ -23,17 +23,26 @@ import androidx.compose.ui.unit.dp
  */
 object HermesTokens {
 
-    /** 配色。与 `HermesSkin` 保持同值（那边是写进偏好种子用的 Int，这边是 Compose Color）。 */
+    /**
+     * 配色。
+     *
+     * 取值**不是自己编的**：直接对齐 Operit2 的 Flutter 主题源码
+     * `apps/flutter/app/lib/ui/theme/OperitTheme.dart`（已下载到 `/root/apkwork/operit2ref/`），
+     * 里面实测到的暗色底是 #0D0E10 / #121212 / #131314 / #161616 / #18181A / #1B1C1E / #262628，
+     * 强调蓝是 #3B82F6，次要文字 #8F929A / #A0A1A7，弱化文字 #4C4D53 / #5A5C63，主文字 #E8EAEF。
+     *
+     * 与 `HermesSkin` 保持同值（那边是写进偏好种子的 Int，这边是 Compose Color）。
+     */
     object Palette {
-        val bg = Color(0xFF070A12)
-        val bgGlow = Color(0xFF0C1424)
-        val surface = Color(0xFF111826)
-        val surfaceHigh = Color(0xFF17202F)
-        val outline = Color(0xFF1F2A3C)
-        val text = Color(0xFFE8EEF7)
-        val textSecondary = Color(0xFF93A1B8)
-        val textMuted = Color(0xFF5D6B82)
-        val primary = Color(0xFF4C8DFF)
+        val bg = Color(0xFF0D0E10)
+        val bgGlow = Color(0xFF16181C)
+        val surface = Color(0xFF161616)
+        val surfaceHigh = Color(0xFF1B1C1E)
+        val outline = Color(0xFF262628)
+        val text = Color(0xFFE8EAEF)
+        val textSecondary = Color(0xFF8F929A)
+        val textMuted = Color(0xFF5A5C63)
+        val primary = Color(0xFF3B82F6)
         val primaryDeep = Color(0xFF1E3A6E)
         val accent = Color(0xFF7BD3FF)
         val danger = Color(0xFFE5534B)

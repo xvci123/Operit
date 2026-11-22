@@ -18,9 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -72,37 +74,41 @@ fun HermesSplash(onFinished: () -> Unit) {
     Box(
             modifier =
                     Modifier.fillMaxSize()
-                            .background(Color(0xFF070A12))
+                            .background(HermesTokens.Palette.bg)
+                            // 光：整屏斜向渐变，端点全透明 → 任何一边都不会出现硬边或截断
+                            .drawBehind {
+                                val p = ramp(clock.floatValue, 50f, 950f)
+                                if (p <= 0f || p >= 1f) return@drawBehind
+                                val w = size.width
+                                val h = size.height
+                                val bandW = w * 1.15f
+                                // 从完全在左侧之外，扫到完全在右下角之外
+                                val cx = -bandW + (w + bandW * 2.2f) * p
+                                // 两层叠加：宽而淡打底 + 窄而亮做主光，形成层次，不是一条纸条
+                                val layers =
+                                        listOf(
+                                                1.00f to 0.32f,
+                                                0.52f to 0.26f
+                                        )
+                                layers.forEach { (scale, peak) ->
+                                        val half = bandW * 0.5f * scale
+                                        drawRect(
+                                                brush =
+                                                        Brush.linearGradient(
+                                                                colors =
+                                                                        listOf(
+                                                                                Color.Transparent,
+                                                                                Color.White.copy(alpha = peak),
+                                                                                Color.Transparent
+                                                                        ),
+                                                                start = Offset(cx - half, -h * 0.2f),
+                                                                end = Offset(cx + half, h * 1.2f)
+                                                        )
+                                        )
+                                }
+                            }
                             .graphicsLayer { alpha = 1f - ramp(clock.floatValue, 1700f, 2000f) }
     ) {
-        // ---------- 斜光：从左上扫到右下 ----------
-        Box(
-                modifier =
-                        Modifier.fillMaxSize()
-                                .graphicsLayer {
-                                    val p = ramp(clock.floatValue, 50f, 950f)
-                                    val w = size.width
-                                    val bandW = w * 0.42f
-                                    // 从完全在左侧之外，扫到完全在右下角之外
-                                    translationX = -bandW + (w + bandW * 1.9f) * p
-                                    // 中间最亮、两端淡出，扫到边缘自然收掉
-                                    alpha = 0.9f * (1f - abs(p - 0.5f) * 1.7f).coerceIn(0f, 1f)
-                                    rotationZ = 18f
-                                    blendMode = BlendMode.Screen
-                                }
-                                .background(
-                                        Brush.horizontalGradient(
-                                                listOf(
-                                                        Color.Transparent,
-                                                        Color.White.copy(alpha = 0.05f),
-                                                        Color.White.copy(alpha = 0.62f),
-                                                        Color.White.copy(alpha = 0.05f),
-                                                        Color.Transparent
-                                                )
-                                        )
-                                )
-        )
-
         // ---------- 鲸鱼 + 品牌字 ----------
         Column(
                 modifier = Modifier.fillMaxSize(),
@@ -141,7 +147,8 @@ fun HermesSplash(onFinished: () -> Unit) {
                         startMs = 1340f,
                         staggerMs = 40f,
                         fadeOutFrom = Float.MAX_VALUE,
-                        fadeOutTo = Float.MAX_VALUE
+                        fadeOutTo = Float.MAX_VALUE,
+                        hollow = true
                 )
             }
         }
@@ -163,7 +170,9 @@ private fun FlipWord(
         startMs: Float,
         staggerMs: Float,
         fadeOutFrom: Float,
-        fadeOutTo: Float
+        fadeOutTo: Float,
+        /** true = 只描边不填充（镂空字）。用 drawStyle=Stroke 实现，不做位图遮罩。 */
+        hollow: Boolean = false
 ) {
     Row {
         word.forEachIndexed { index, ch ->
@@ -171,10 +180,12 @@ private fun FlipWord(
                     text = ch.toString(),
                     style =
                             TextStyle(
-                                    color = Color(0xFFE8EEF7),
+                                    color = HermesTokens.Palette.text,
                                     fontSize = 30.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 3.sp
+                                    letterSpacing = 3.sp,
+                                    // 镂空：颜色仍给（描边用这个颜色），把绘制样式换成描边
+                                    drawStyle = if (hollow) Stroke(width = 1.6f) else null
                             ),
                     modifier =
                             Modifier.graphicsLayer {

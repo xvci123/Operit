@@ -39,18 +39,22 @@ fun HermesEmptyChat(modifier: Modifier = Modifier) {
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 modifier =
-                        Modifier.size(112.dp).graphicsLayer {
-                            // 不要抢眼：半透明，像水印
-                            alpha = 0.42f
+                        Modifier.size(124.dp).graphicsLayer {
+                            // 之前 0.42 太暗，真机上几乎看不清；提到 0.82 ——
+                            // 既清楚可辨，又不至于抢过输入框
+                            alpha = 0.82f
                         }
         )
         Text(
                 text = stringResource(R.string.hermes_tagline),
-                color = androidx.compose.ui.graphics.Color(0xFF5D6B82),
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 4.sp,
-                modifier = Modifier.padding(top = 18.dp)
+                // 主文字色（#E8EAEF，与 Operit2 源码一致的文字色），不再用弱化的灰
+                color = HermesTokens.Palette.text,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Light,
+                // 中文思源系在多数机器上是系统默认；这里靠字距与字重做"轻奢感"，
+                // 不引入新字体文件（避免 APK 再大一截）
+                letterSpacing = 8.sp,
+                modifier = Modifier.padding(top = 20.dp)
         )
     }
 }

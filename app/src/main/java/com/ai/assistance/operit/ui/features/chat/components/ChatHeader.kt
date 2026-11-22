@@ -58,7 +58,7 @@ fun ChatHeader(
                         Surface(
                                 modifier = Modifier.height(28.dp),
                                 shape = RoundedCornerShape(14.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                                color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh,
                                 tonalElevation = 0.dp,
                                 shadowElevation = 0.dp
                         ) {
@@ -70,12 +70,12 @@ fun ChatHeader(
                                         Text(
                                                 text = "\u2442",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.textSecondary
                                         )
                                         Text(
                                                 text = "${subagentCount} 个子代理",
                                                 style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.textSecondary
                                         )
                                 }
                         }
@@ -139,8 +139,8 @@ fun ChatHeader(
                                                                 ?: if (showChatHistorySelector)
                                                                         MaterialTheme.colorScheme.primary
                                                                 else
-                                                                        MaterialTheme.colorScheme.onSurface
-                                                                                .copy(alpha = 0.7f),
+                                                                        com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text
+                                                                                .copy(alpha = 0.92f),
                                                 modifier = Modifier.size(20.dp)
                                         )
                                 }
@@ -172,8 +172,8 @@ fun ChatHeader(
                                                         ?: if (isFloatingMode)
                                                                 MaterialTheme.colorScheme.primary
                                                         else
-                                                                MaterialTheme.colorScheme.onSurface
-                                                                        .copy(alpha = 0.7f),
+                                                                com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text
+                                                                        .copy(alpha = 0.92f),
                                         modifier = Modifier.size(20.dp)
                                 )
                         }
@@ -218,6 +218,8 @@ fun ChatHeader(
                         Text(
                                 text = displayCharacterName,
                                 style = MaterialTheme.typography.bodyMedium,
+                                // 显式给文字色：不写会落到 LocalContentColor，深底上偏暗
+                                color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.widthIn(max = 116.dp)
