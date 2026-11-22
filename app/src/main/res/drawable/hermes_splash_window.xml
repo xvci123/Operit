@@ -8,6 +8,6 @@
         android:gravity="center">
         <bitmap
             android:src="@drawable/whale_alpha"
-            android:gravity="center" />
+            android:gravity="fill" />
     </item>
 </layer-list>
