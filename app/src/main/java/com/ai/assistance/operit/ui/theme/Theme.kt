@@ -15,6 +15,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Shapes
+import com.ai.assistance.operit.ui.hermes.HermesTokens
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -491,6 +494,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
 
             if (useBackgroundImage && backgroundImageUri != null) {
                 MaterialTheme(
+                    shapes = HermesShapes,
                     colorScheme =
                         colorScheme.copy(
                             surface = colorScheme.surface.copy(alpha = 1f),
@@ -511,6 +515,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 )
             } else {
                 MaterialTheme(
+                    shapes = HermesShapes,
                     colorScheme = colorScheme,
                     typography = customTypography,
                     content = content,
@@ -519,6 +524,25 @@ fun OperitTheme(content: @Composable () -> Unit) {
         }
     }
 }
+
+/**
+ * Hermes 主题形状（P1-1）。
+ *
+ * 一代从来没有定制过 `Shapes`（`grep "Shapes(" ` 零结果），所以 Button / Card / Dialog /
+ * TextField 这些走 Material 默认形状的组件，圆角一直是 Material 默认的 4~12dp。
+ * 在这里改一次，这些组件**全部**抬到 8/12/16/24/28。
+ *
+ * 注意：硬编码 `RoundedCornerShape(x.dp)` 的调用点不读这里（全项目 500+ 处），
+ * 那些要逐屏替换，见《Hermes-换皮方案-V1.md》§6.2。
+ */
+private val HermesShapes =
+        Shapes(
+                extraSmall = RoundedCornerShape(HermesTokens.Radius.xs),
+                small = RoundedCornerShape(HermesTokens.Radius.sm),
+                medium = RoundedCornerShape(HermesTokens.Radius.md),
+                large = RoundedCornerShape(HermesTokens.Radius.lg),
+                extraLarge = RoundedCornerShape(HermesTokens.Radius.xl)
+        )
 
 /** 为亮色主题生成基于主色的完整颜色方案 */
 private fun generateLightColorScheme(
