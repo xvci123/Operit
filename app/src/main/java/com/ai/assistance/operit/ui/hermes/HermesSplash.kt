@@ -45,7 +45,12 @@ import com.ai.assistance.operit.R
  * 所有动画值只在 drawBehind / graphicsLayer 中读取，避免逐帧重组。
  */
 @Composable
-fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
+fun HermesSplash(
+        flyToHeader: Boolean,
+        /** 主界面还没准备好时保持最后一帧，不能先淡成黑屏。 */
+        hold: Boolean = false,
+        onFinished: () -> Unit
+) {
     val clock = remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
@@ -64,14 +69,17 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .background(HermesTokens.Palette.bg)
-            .graphicsLayer { alpha = 1f - ramp(clock.floatValue, 2200f, TOTAL_MS) }
+            .graphicsLayer {
+                alpha = if (hold) 1f
+                else 1f - ramp(clock.floatValue, 2200f, TOTAL_MS)
+            }
     ) {
         val whaleCenterX = maxWidth / 2
         val whaleCenterY = maxHeight / 2 - 32.dp
-        val targetX = 28.dp
+        val targetX = 65.dp
         val targetY = statusTop + 32.dp
         val startSize = 148.dp
-        val endSize = 24.dp
+        val endSize = 22.dp
 
         // 局部柔光，而不是覆盖全屏的白色渐变。任何一帧都不会把整屏刷白。
         Box(
@@ -96,26 +104,30 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
                     radius = size.width * (0.22f + 0.25f * lightIn)
                 )
 
-                // 斜向光扫：参考图要的“开场有一道光线”。峰值只有 0.10，
-                // 并且是窄带渐变，不是整屏刷白；两端全透明，不会露矩形边。
+                // “一束光”而不是一整片：宽而极淡的底光 + 窄而亮的芯，
+                // 斜着扫过全屏。峰值仍远低于全白，不会出现突然刷白。
                 val sweep = ramp(now, 0f, 1150f)
                 if (sweep > 0f && sweep < 1f) {
                     val w = size.width
                     val h = size.height
-                    val band = w * 0.52f
-                    val cx = -band + (w + band * 2f) * sweep
-                    val peak = 0.10f * kotlin.math.sin(sweep * kotlin.math.PI.toFloat())
-                    drawRect(
-                        brush = Brush.linearGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.White.copy(alpha = peak),
-                                Color.Transparent
-                            ),
-                            start = Offset(cx - band, -h * 0.15f),
-                            end = Offset(cx + band, h * 1.15f)
+                    val cx = -w * 0.18f + (w * 1.36f) * sweep
+                    val pulse = kotlin.math.sin(sweep * kotlin.math.PI.toFloat())
+                    listOf(
+                        w * 0.16f to 0.055f,
+                        w * 0.035f to 0.26f
+                    ).forEach { (band, peak) ->
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.Transparent,
+                                    Color.White.copy(alpha = peak * pulse),
+                                    Color.Transparent
+                                ),
+                                start = Offset(cx - band, -h * 0.12f),
+                                end = Offset(cx + band, h * 1.12f)
+                            )
                         )
-                    )
+                    }
                 }
 
                 // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。

@@ -56,6 +56,8 @@ import com.ai.assistance.operit.util.AnrMonitor
 import com.ai.assistance.operit.util.LocaleUtils
 import java.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.ai.assistance.operit.data.mcp.MCPRepository
@@ -77,6 +79,8 @@ class MainActivity : ComponentActivity() {
     private var showOrientationChangeDialog by mutableStateOf(false)
     /** Hermes：冷启动动画是否已播过（Activity 存活期内只播一次，进程重启自然重置）。 */
     private var hermesSplashDone by mutableStateOf(false)
+    /** Hermes：主界面初始化是否完成；未完成时只组合轻量启动页，不组合整个 OperitApp。 */
+    private var hermesBootReady by mutableStateOf(false)
     /** 协议/配置完成前不播放“飞向聊天页左上角”，避免承诺一个尚不存在的目的地。 */
     private var hermesOnboardingFinished by mutableStateOf(false)
 
@@ -200,37 +204,56 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
         restoreRuntimeTaskViewVisibilityIfNeeded()
 
-        (application as OperitApplication).initializeMainApplication()
-
-        // 语言设置已在Application中初始化，这里无需重复
-
-        initializeComponents()
-        anrMonitor.start()
-        configureDisplaySettings()
-
-        // 设置上下文以便获取插件元数据
-        pluginLoadingState.setAppContext(this)
-        PluginLoadingStateRegistry.bind(pluginLoadingState, lifecycleScope)
-
-        // 设置跳过加载的回调
-        pluginLoadingState.setOnSkipCallback {
-            AppLogger.d(TAG, "用户跳过了插件加载过程")
-            Toast.makeText(this, getString(R.string.plugin_loading_skipped), Toast.LENGTH_SHORT).show()
-        }
-
-        // 在 Compose 首帧前确定目的地，避免新用户先按“聊天页”播放飞行再跳配置。
-        checkPermissionLevelSet()
-
-        // 设置初始界面
+        // Hermes：先把轻量启动页挂上去，再在后台初始化。这样首帧不再等
+        // initializeMainApplication + 整个 OperitApp 组合完成，动画不会被启动耗时吃掉。
+        agreementPreferences = AgreementPreferences(this)
+        hermesOnboardingFinished =
+                agreementPreferences.isAgreementAccepted() &&
+                        androidPermissionPreferences.getPreferredPermissionLevel() != null
         setAppContent()
 
-        // 初始化并设置更新管理器
-        setupUpdateManager()
+        lifecycleScope.launch {
+            // 让启动页先拿到第一帧。
+            delay(32)
+            try {
+                withContext(Dispatchers.Default) {
+                    (application as OperitApplication).initializeMainApplication()
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Hermes startup initialization failed", e)
+            }
 
-        // 只在首次创建时执行检查（非配置变更）
-        if (savedInstanceState == null) {
-            // 进行必要的初始检查
-            performInitialChecks()
+            initializeComponents()
+            anrMonitor.start()
+            configureDisplaySettings()
+
+            // 设置上下文以便获取插件元数据
+            pluginLoadingState.setAppContext(this@MainActivity)
+            PluginLoadingStateRegistry.bind(pluginLoadingState, lifecycleScope)
+
+            // 设置跳过加载的回调
+            pluginLoadingState.setOnSkipCallback {
+                AppLogger.d(TAG, "用户跳过了插件加载过程")
+                Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.plugin_loading_skipped),
+                        Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            // 在真正挂主界面前确定目的地，避免新用户先按“聊天页”播放飞行再跳配置。
+            checkPermissionLevelSet()
+
+            // 初始化并设置更新管理器
+            setupUpdateManager()
+
+            // 只在此后组合完整 App，启动页遮住这段组合耗时。
+            hermesBootReady = true
+
+            // 只在首次创建时执行检查（非配置变更）
+            if (savedInstanceState == null) {
+                performInitialChecks()
+            }
         }
 
         // 设置双击返回退出
@@ -621,6 +644,14 @@ class MainActivity : ComponentActivity() {
     // ======== 设置应用内容 ========
     private fun setAppContent() {
         setContent {
+            if (!hermesBootReady || !hermesSplashDone) {
+                // 启动阶段只组合这一棵树，绝不组合整个 OperitApp。
+                HermesSplash(
+                        flyToHeader = hermesOnboardingFinished,
+                        hold = !hermesBootReady,
+                        onFinished = { hermesSplashDone = true }
+                )
+            } else {
             OperitTheme {
                 Box {
                     // 检查是否需要显示用户协议
@@ -716,15 +747,6 @@ class MainActivity : ComponentActivity() {
                             loadingState = pluginLoadingState,
                             modifier = Modifier.zIndex(10f)
                     )
-
-                    // Hermes：冷启动动画。放在最后 → 盖在所有内容之上（包括插件加载页），
-                    // 2 秒后自己撤掉，主界面早就在底下布局好了，不会有跳转闪烁。
-                    if (!hermesSplashDone) {
-                        HermesSplash(
-                                flyToHeader = hermesOnboardingFinished,
-                                onFinished = { hermesSplashDone = true }
-                        )
-                    }
                 }
 
                 // 方向改变时显示对话框
@@ -742,6 +764,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
 
 
     private fun getHighestRefreshRate(): Int {

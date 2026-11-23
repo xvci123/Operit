@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.WindowManager
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -37,7 +38,9 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -313,40 +316,50 @@ fun AppContent(
                         }
                     },
                     navigationIcon = {
-                        // 导航按钮逻辑
-                        IconButton(
-                            onClick = {
-                                if (canGoBack) {
-                                    onGoBack()
-                                } else {
-                                    // 平板模式下切换侧边栏展开/收起状态
-                                    if (useTabletLayout) {
-                                        onToggleSidebar()
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // 三横线：抽屉入口。
+                            IconButton(
+                                onClick = {
+                                    if (canGoBack) {
+                                        onGoBack()
                                     } else {
-                                        // 手机模式下打开抽屉
-                                        scope.launch { drawerState.open() }
+                                        if (useTabletLayout) {
+                                            onToggleSidebar()
+                                        } else {
+                                            scope.launch { drawerState.open() }
+                                        }
                                     }
                                 }
+                            ) {
+                                Icon(
+                                    if (canGoBack) Icons.Default.ArrowBack
+                                    else if (useTabletLayout)
+                                        if (isTabletSidebarExpanded) Icons.Filled.ChevronLeft
+                                        else Icons.Default.Menu
+                                    else Icons.Default.Menu,
+                                    contentDescription =
+                                    when {
+                                        canGoBack -> stringResource(R.string.app_content_navigate_back)
+                                        useTabletLayout ->
+                                            if (isTabletSidebarExpanded) stringResource(R.string.app_content_collapse_sidebar)
+                                            else stringResource(R.string.app_content_expand_sidebar)
+                                        else -> stringResource(id = R.string.menu)
+                                    },
+                                    tint = appBarContentColor
+                                )
                             }
-                        ) {
-                            // 左上角恢复三横线（参考图的抽屉入口）。返回/平板侧栏仍按原逻辑。
-                            Icon(
-                                if (canGoBack) Icons.Default.ArrowBack
-                                else if (useTabletLayout)
-                                // 平板模式下使用开关图标表示收起/展开
-                                    if (isTabletSidebarExpanded) Icons.Filled.ChevronLeft
-                                    else Icons.Default.Menu
-                                else Icons.Default.Menu,
-                                contentDescription =
-                                when {
-                                    canGoBack -> stringResource(R.string.app_content_navigate_back)
-                                    useTabletLayout ->
-                                        if (isTabletSidebarExpanded) stringResource(R.string.app_content_collapse_sidebar)
-                                        else stringResource(R.string.app_content_expand_sidebar)
-                                    else -> stringResource(id = R.string.menu)
-                                },
-                                tint = appBarContentColor
-                            )
+                            // 启动动画的落点：菜单右侧的小鲸鱼。它只是品牌标记，
+                            // 不承担导航，避免再次把抽屉入口替换掉。
+                            if (!canGoBack && !useTabletLayout) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.whale_alpha),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .padding(start = 2.dp, end = 6.dp)
+                                        .size(22.dp),
+                                    colorFilter = ColorFilter.tint(appBarContentColor)
+                                )
+                            }
                         }
                     },
                     actions = actions,

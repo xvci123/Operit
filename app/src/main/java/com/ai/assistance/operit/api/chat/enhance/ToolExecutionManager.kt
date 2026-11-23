@@ -8,6 +8,7 @@ import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.core.tools.AIToolHookDecision
 import com.ai.assistance.operit.core.tools.StringResultData
 import com.ai.assistance.operit.core.tools.ToolExecutor
+import com.ai.assistance.operit.core.tools.HermesToolRuntime
 import com.ai.assistance.operit.core.tools.climode.CliToolModeSupport
 import com.ai.assistance.operit.core.tools.climode.ToolExposureMode
 import com.ai.assistance.operit.data.model.ToolInvocation
@@ -30,6 +31,7 @@ import com.ai.assistance.operit.util.stream.splitBy
 import com.ai.assistance.operit.util.stream.stream
 import com.ai.assistance.operit.util.LocaleUtils
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
@@ -853,16 +855,9 @@ object ToolExecutionManager {
             }
         }
 
-        // 4. 按并行/串行对工具进行分组
-        val parallelizableToolNames = setOf(
-            "list_files", "read_file", "read_file_part", "read_file_full", "file_exists",
-            "find_files", "file_info", "grep_code", "calculate", "ffmpeg_info",
-            "visit_web", "download_file"
-        )
+        // 4. 按策略层决定并行/串行。默认串行、无超时；只读工具才允许并行。
         val (parallelInvocations, serialInvocations) = injectedInvocations.partition {
-            parallelizableToolNames.contains(
-                it.value.tool.name
-            )
+            HermesToolRuntime.isConcurrencySafe(it.value.tool.name)
         }
 
         // 5. 执行工具并收集聚合结果
@@ -972,7 +967,10 @@ object ToolExecutionManager {
                 toolHandler.notifyToolExecutionStarted(invocation.tool)
 
                 val annotated = if (subtask == null) {
-                    aggregateToolResults(displayToolName, executeToolSafely(invocation, executor, toolHandler))
+                    collectWithDeadline(
+                        displayToolName,
+                        executeToolSafely(invocation, executor, toolHandler)
+                    )
                 } else {
                     collectSubtaskToolResult(subtask, resolveSubtaskTarget(invocation.tool), displayToolName) {
                         executeToolSafely(invocation, executor, toolHandler, parametersValidated = true)
@@ -1026,9 +1024,26 @@ object ToolExecutionManager {
         return ToolResult(
             toolName = displayToolName,
             success = lastResult.success,
-            result = StringResultData(combinedResultString),
+            result = StringResultData(
+                HermesToolRuntime.limitForModel(displayToolName, combinedResultString)
+            ),
             error = lastResult.error
         )
+    }
+
+    /**
+     * 只在策略层声明了 deadline 的工具上套超时；shell/设备命令保持不限时。
+     * 超时物化为错误结果，不把异常抛回会话层。
+     */
+    private suspend fun collectWithDeadline(
+        displayToolName: String,
+        source: Flow<ToolResult>
+    ): ToolResult {
+        val deadline = HermesToolRuntime.deadlineMs(displayToolName)
+            ?: return aggregateToolResults(displayToolName, source)
+        return withTimeoutOrNull(deadline) {
+            aggregateToolResults(displayToolName, source)
+        } ?: HermesToolRuntime.timeoutResult(displayToolName, deadline)
     }
 
     /**
