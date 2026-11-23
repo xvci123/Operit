@@ -355,7 +355,7 @@ fun AgentChatInputSection(
         fontSize = 14.sp,
         lineHeight = 20.sp,
         color = if (com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK)
-            Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
+            Color(0xFFF4F6F9) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
     )
     val mentionVisualTransformation = rememberMentionVisualTransformation(inputTextStyle)
     val colorScheme = MaterialTheme.colorScheme
@@ -499,7 +499,7 @@ fun AgentChatInputSection(
         }
     }
 
-    val isDarkTheme = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
+    val isDarkTheme = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
     val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val darkModeInputColor =
         if (hermesSkin) {
@@ -507,7 +507,7 @@ fun AgentChatInputSection(
         } else {
             lerp(
                 MaterialTheme.colorScheme.surface,
-                MaterialTheme.colorScheme.onSurface,
+                if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                 0.08f,
             )
         }
@@ -694,7 +694,7 @@ fun AgentChatInputSection(
                         Text(
                             text = "${stringResource(R.string.reply_message)}: $previewText",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
@@ -704,7 +704,7 @@ fun AgentChatInputSection(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = context.getString(R.string.cancel_reply),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp),
                             )
                         }
@@ -738,7 +738,7 @@ fun AgentChatInputSection(
                         Text(
                             text = processingMessage,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -786,11 +786,11 @@ fun AgentChatInputSection(
                     Modifier.topEdgeHighlight(
                         shape = inputCardShape,
                         lineColor =
-                            MaterialTheme.colorScheme.onSurface.copy(
+                            if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface.copy(
                                 alpha = if (chatInputFloating) 0.03f else 0.05f,
                             ),
                         glowColor =
-                            MaterialTheme.colorScheme.onSurface.copy(
+                            if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface.copy(
                                 alpha = if (chatInputFloating) 0.008f else 0.015f,
                             ),
                         glowHeight = if (chatInputFloating) 1.dp else 2.dp,
@@ -886,7 +886,7 @@ fun AgentChatInputSection(
                                 Icon(
                                     imageVector = Icons.Default.Fullscreen,
                                     contentDescription = stringResource(R.string.chat_fullscreen_input),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         },
@@ -924,7 +924,7 @@ fun AgentChatInputSection(
                                     Text(
                                         text = modelLabel,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
+                                        color = if (hermesSkin) Color(0xFFF4F6F9) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.widthIn(max = 160.dp),
@@ -938,7 +938,7 @@ fun AgentChatInputSection(
                                                 Icons.Default.KeyboardArrowDown
                                             },
                                         contentDescription = context.getString(R.string.select_model_config),
-                                        tint = if (hermesSkin) Color(0xFFA6ACB8) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp),
                                     )
                                 }
@@ -966,7 +966,7 @@ fun AgentChatInputSection(
                                     if (showExtraSettingsPopup.value) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                        if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant
                                     },
                                 modifier = Modifier.size(20.dp),
                             )
@@ -994,7 +994,7 @@ fun AgentChatInputSection(
                                     if (showAttachmentPanel) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                                        if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                                     },
                                 modifier = Modifier.size(24.dp),
                             )
@@ -1186,7 +1186,7 @@ fun AgentChatInputSection(
                                     Icon(
                                         imageVector = Icons.Default.Fullscreen,
                                         contentDescription = stringResource(R.string.chat_fullscreen_input),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                             },
@@ -1224,7 +1224,7 @@ fun AgentChatInputSection(
                                         Text(
                                             text = modelLabel,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
+                                            color = if (hermesSkin) Color(0xFFF4F6F9) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.widthIn(max = 160.dp),
@@ -1238,7 +1238,7 @@ fun AgentChatInputSection(
                                                     Icons.Default.KeyboardArrowDown
                                                 },
                                             contentDescription = context.getString(R.string.select_model_config),
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.size(18.dp),
                                         )
                                     }
@@ -1266,7 +1266,7 @@ fun AgentChatInputSection(
                                         if (showExtraSettingsPopup.value) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                            if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                     modifier = Modifier.size(20.dp),
                                 )
@@ -1294,7 +1294,7 @@ fun AgentChatInputSection(
                                         if (showAttachmentPanel) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                                            if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
                                         },
                                     modifier = Modifier.size(24.dp),
                                 )
@@ -1744,14 +1744,14 @@ private fun AgentThinkingSettingsItem(
         Icon(
             imageVector = Icons.Rounded.Psychology,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
         IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -1759,7 +1759,7 @@ private fun AgentThinkingSettingsItem(
         Text(
             text = stringResource(R.string.thinking_settings) + ":",
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -1775,7 +1775,7 @@ private fun AgentThinkingSettingsItem(
             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         )
     }
 
@@ -1794,7 +1794,7 @@ private fun AgentThinkingSettingsItem(
                     if (enableThinkingMode) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     },
                 isChecked = enableThinkingMode,
                 onToggle = onToggleThinkingMode,
@@ -1866,7 +1866,7 @@ private fun AgentThinkingSubSettingItem(
                 Icon(
                     imageVector = Icons.Outlined.Info,
                     contentDescription = stringResource(R.string.details),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp),
                 )
             }
@@ -1880,7 +1880,7 @@ private fun AgentThinkingSubSettingItem(
                     if (isChecked) {
                         MaterialTheme.colorScheme.primary
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                     },
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
             )
@@ -1926,7 +1926,7 @@ private fun AgentMaxContextSettingItem(
                 if (enableMaxContextMode) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 },
             modifier = Modifier.size(16.dp),
         )
@@ -1934,7 +1934,7 @@ private fun AgentMaxContextSettingItem(
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -1942,7 +1942,7 @@ private fun AgentMaxContextSettingItem(
         Text(
             text = stringResource(R.string.max_mode_title),
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -2009,14 +2009,14 @@ private fun AgentModelSelectorItem(
         Icon(
             imageVector = Icons.Outlined.DataObject,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
         IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -2024,7 +2024,7 @@ private fun AgentModelSelectorItem(
         Text(
             text = stringResource(R.string.model) + ":",
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -2041,7 +2041,7 @@ private fun AgentModelSelectorItem(
                 imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
         }
     }
@@ -2058,7 +2058,7 @@ private fun AgentModelSelectorItem(
                 Text(
                     text = stringResource(R.string.no_models_available),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             } else {
@@ -2107,7 +2107,7 @@ private fun AgentModelSelectorItem(
                                         if (isSelected) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSurface
+                                            if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                                         },
                                     fontSize = 13.sp,
                                     maxLines = 2,
@@ -2119,7 +2119,7 @@ private fun AgentModelSelectorItem(
                                     Text(
                                         text = stringResource(R.string.chat_model_count, modelList.size),
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 10.sp,
                                     )
                                     Icon(
@@ -2131,13 +2131,13 @@ private fun AgentModelSelectorItem(
                                             },
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 } else {
                                     Text(
                                         text = config.modelName,
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         fontSize = 11.sp,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
@@ -2194,7 +2194,7 @@ private fun AgentModelSelectorItem(
                                                 if (isModelSelected) {
                                                     MaterialTheme.colorScheme.primary
                                                 } else {
-                                                    MaterialTheme.colorScheme.onSurface
+                                                    if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                                                 },
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis,
@@ -2513,14 +2513,14 @@ private fun AgentMemorySelectorItem(
         Icon(
             imageVector = Icons.Outlined.DataObject,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
         IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -2528,7 +2528,7 @@ private fun AgentMemorySelectorItem(
         Text(
             text = stringResource(R.string.memory) + ":",
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -2544,7 +2544,7 @@ private fun AgentMemorySelectorItem(
             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         )
     }
 
@@ -2580,7 +2580,7 @@ private fun AgentMemorySelectorItem(
                             if (isSelected) {
                                 MaterialTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.onSurface
+                                if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                             },
                         fontSize = 13.sp,
                         maxLines = 2,
@@ -2650,14 +2650,14 @@ private fun AgentSettingsGroupHeader(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
         IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -2665,7 +2665,7 @@ private fun AgentSettingsGroupHeader(
         Text(
             text = title,
             fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -2681,7 +2681,7 @@ private fun AgentSettingsGroupHeader(
             imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
             contentDescription = null,
             modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         )
     }
 }
@@ -2765,7 +2765,7 @@ private fun AgentPermissionSegmentedControl(
     ) {
         Text(
             text = stringResource(R.string.permission_level),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -2816,7 +2816,7 @@ private fun AgentPermissionSegmentedControl(
                         if (isSelected) {
                             MaterialTheme.colorScheme.onPrimary
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                     },
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -2957,11 +2957,11 @@ private fun AgentSimpleToggleSettingItem(
             contentDescription = null,
             tint =
                 if (!isEnabled) {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+                    if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                 } else if (isChecked) {
                     MaterialTheme.colorScheme.primary
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                 },
             modifier = Modifier.size(16.dp),
         )
@@ -2969,7 +2969,7 @@ private fun AgentSimpleToggleSettingItem(
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -2980,8 +2980,8 @@ private fun AgentSimpleToggleSettingItem(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             color =
-                if (isEnabled) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                if (isEnabled) if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
+                else if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.weight(1f),
         )
         Switch(
@@ -3047,14 +3047,14 @@ private fun AgentActionSettingItem(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier.size(16.dp),
         )
         IconButton(onClick = onInfoClick, modifier = Modifier.size(24.dp)) {
             Icon(
                 imageVector = Icons.Outlined.Info,
                 contentDescription = stringResource(R.string.details),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 modifier = Modifier.size(16.dp),
             )
         }
@@ -3064,7 +3064,7 @@ private fun AgentActionSettingItem(
             fontSize = 13.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
     }
@@ -3121,13 +3121,13 @@ private fun AgentInfoPopup(
                         text = infoPopupContent.first,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = infoPopupContent.second,
                         fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 20.sp,
                     )
                 }

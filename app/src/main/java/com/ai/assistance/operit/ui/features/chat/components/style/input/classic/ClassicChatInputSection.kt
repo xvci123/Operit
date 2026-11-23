@@ -335,7 +335,7 @@ fun ClassicChatInputSection(
                         Text(
                             text = "${stringResource(R.string.reply_message)}: $previewText",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f)
@@ -348,7 +348,7 @@ fun ClassicChatInputSection(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = context.getString(R.string.cancel_reply),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -439,7 +439,7 @@ fun ClassicChatInputSection(
                             text = message,
                             style = MaterialTheme.typography.bodySmall,
                             color =
-                            MaterialTheme.colorScheme.onSurface
+                            if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
                                 .copy(alpha = 0.8f),
                             modifier = Modifier.weight(1f)
                         )
@@ -522,7 +522,7 @@ fun ClassicChatInputSection(
                                 false
                             }
                         },
-                    textStyle = modernTextStyle.copy(color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface),
+                    textStyle = modernTextStyle.copy(color = if (hermesSkin) Color(0xFFF4F6F9) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
                     maxLines = 5,
@@ -573,7 +573,7 @@ fun ClassicChatInputSection(
                                                 context.getString(R.string.input_question_hint)
                                             },
                                         style = modernTextStyle,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 innerTextField()
@@ -586,7 +586,7 @@ fun ClassicChatInputSection(
                                 Icon(
                                     imageVector = Icons.Default.Fullscreen,
                                     contentDescription = stringResource(R.string.chat_fullscreen_input),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (hermesSkin) Color(0xFFA6ACB8) else if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp),
                                 )
                             }
