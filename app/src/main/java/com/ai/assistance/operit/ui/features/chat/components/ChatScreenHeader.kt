@@ -155,8 +155,8 @@ fun ChatScreenHeader(
                         }
             }
 
-    val headerShape = RoundedCornerShape(if (hermesDark) 0.dp else 24.dp)
     val hermesDark = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
+    val headerShape = RoundedCornerShape(if (hermesDark) 0.dp else 24.dp)
     Row(
             modifier =
                     modifier
