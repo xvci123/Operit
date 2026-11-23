@@ -144,7 +144,7 @@ fun HermesSplash(
                 modifier = Modifier.size(startSize).graphicsLayer {
                     val now = clock.floatValue
                     val rise = easeOutCubic(ramp(now, 0f, 650f))
-                    val fly = if (flyToHeader) {
+                    val fly = if (flyToHeader && !hold) {
                         easeInOutCubic(ramp(now, 1750f, 2200f))
                     } else {
                         0f

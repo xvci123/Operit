@@ -23,9 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
@@ -83,8 +81,6 @@ class MainActivity : ComponentActivity() {
     private var hermesSplashDone by mutableStateOf(false)
     /** Hermes：主界面初始化是否完成；未完成时只组合轻量启动页，不组合整个 OperitApp。 */
     private var hermesBootReady by mutableStateOf(false)
-    /** App 已经真正布局出来；只有到这一步才允许撤启动页，避免撤掉后黑屏。 */
-    private var hermesAppLaidOut by mutableStateOf(false)
     /** 协议/配置完成前不播放“飞向聊天页左上角”，避免承诺一个尚不存在的目的地。 */
     private var hermesOnboardingFinished by mutableStateOf(false)
 
@@ -648,15 +644,16 @@ class MainActivity : ComponentActivity() {
     // ======== 设置应用内容 ========
     private fun setAppContent() {
         setContent {
-            Box {
-                if (hermesBootReady) {
-                    key("hermes_app") {
-                        OperitTheme {
-                            Box(
-                                modifier = Modifier.onGloballyPositioned {
-                                    if (!hermesAppLaidOut) hermesAppLaidOut = true
-                                }
-                            ) {
+            if (!hermesBootReady || !hermesSplashDone) {
+                // 启动阶段只组合这一棵树，绝不组合整个 OperitApp。
+                HermesSplash(
+                        flyToHeader = hermesOnboardingFinished,
+                        hold = !hermesBootReady,
+                        onFinished = { hermesSplashDone = true }
+                )
+            } else {
+            OperitTheme {
+                Box {
                     // 检查是否需要显示用户协议
                         if (!agreementPreferences.isAgreementAccepted()) {
                             AgreementScreen(
@@ -764,18 +761,6 @@ class MainActivity : ComponentActivity() {
                             showOrientationChangeDialog = false
                         }
                     )
-                }
-            }
-        }
-                }
-                if (!hermesSplashDone || !hermesAppLaidOut) {
-                    key("hermes_splash") {
-                        HermesSplash(
-                            flyToHeader = hermesOnboardingFinished && hermesAppLaidOut,
-                            hold = !hermesAppLaidOut,
-                            onFinished = { hermesSplashDone = true }
-                        )
-                    }
                 }
             }
         }
