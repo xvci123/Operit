@@ -361,7 +361,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(if (darkTheme) Color.Black else Color.White)
+                            .background(if (darkTheme) colorScheme.background else Color.White)
                             .then(
                                 if (waterGlassState != null) {
                                     Modifier.liquefiable(waterGlassState)
@@ -380,7 +380,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                                 model = uri,
                                 error =
                                     rememberAsyncImagePainter(
-                                        if (darkTheme) Color.Black else Color.White
+                                        if (darkTheme) colorScheme.background else Color.White
                                     ),
                             )
 

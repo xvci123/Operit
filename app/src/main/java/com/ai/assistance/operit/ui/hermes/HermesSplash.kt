@@ -89,12 +89,9 @@ fun HermesSplash(
                 val w = size.width
                 val h = size.height
                 val center = Offset(w / 2f, h / 2f - 32.dp.toPx())
-                val lightIn = ramp(now, 0f, 420f)
-                val lightOut = 1f - ramp(now, 850f, 1250f)
-                val strength = lightIn * lightOut
 
-                // 真正斜向的一束光：比鲸鱼更早出现，亮芯从左上穿到右下。
-                // 不放在光晕的 if 内，保证开场第一时间就有扫光。
+                // 真正的斜向扫束：从左上穿到右下，先于鲸鱼出现。
+                // 不加径向光晕，避免又变成“鲸鱼背后一圈光”。
                 val sweep = ramp(now, 0f, 1050f)
                 if (sweep > 0f && sweep < 1f) {
                     val cx = -w * 0.30f + w * 1.60f * sweep
@@ -115,22 +112,6 @@ fun HermesSplash(
                             )
                         )
                     }
-                }
-
-                // 只留很弱的聚焦底光，不拿它替代扫光。
-                if (strength > 0f) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.035f * strength),
-                                Color.Transparent
-                            ),
-                            center = center,
-                            radius = w * (0.20f + 0.18f * lightIn)
-                        ),
-                        center = center,
-                        radius = w * (0.20f + 0.18f * lightIn)
-                    )
                 }
 
                 // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。

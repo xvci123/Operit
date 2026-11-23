@@ -28,15 +28,14 @@ object HermesSkin {
      */
     const val FORCE_DARK = true
 
-    // 对齐 Operit2 主题源码里的真实色值（apps/flutter/app/lib/ui/theme/OperitTheme.dart）：
-    // 底 #0D0E10、强调蓝 #3B82F6、主文字 #E8EAEF
-    const val BG = 0xFF0D0E10.toInt()
-    const val SURFACE = 0xFF161616.toInt()
-    const val PRIMARY = 0xFF3B82F6.toInt()
+    // DSHA 式深灰分层：底 #15171B、卡片 #1E2127、次级卡 #282C34、描边 #3A3F4A
+    const val BG = 0xFF15171B.toInt()
+    const val SURFACE = 0xFF1E2127.toInt()
+    const val PRIMARY = 0xFF4C8DFF.toInt()
     const val PRIMARY_DEEP = 0xFF1E3A6E.toInt()
     const val ACCENT = 0xFF7BD3FF.toInt()
-    const val TEXT = 0xFFE8EEF7.toInt()
-    const val TEXT_SECONDARY = 0xFF93A1B8.toInt()
+    const val TEXT = 0xFFF0F2F6.toInt()
+    const val TEXT_SECONDARY = 0xFFA6ACB8.toInt()
     const val DANGER = 0xFFE5534B.toInt()
     const val SUCCESS = 0xFF4CB782.toInt()
 
@@ -45,8 +44,9 @@ object HermesSkin {
      *
      * 换色板必须换版本号：老机器上 `skin_seeded` 早就写过，不换版本号新色值永远不会生效。
      * v1 = 最初的黑蓝（#070A12 / #4C8DFF）；v2 = 对齐 Operit2 的 #0D0E10 / #3B82F6。
+     * v3 = DSHA 深灰分层（#15171B / #4C8DFF）。
      */
-    private const val SEED_VERSION = 2
+    private const val SEED_VERSION = 3
 
     private fun marker(context: Context): File =
             File(File(context.filesDir, "hermes"), "skin_seeded_v$SEED_VERSION")
