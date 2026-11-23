@@ -31,8 +31,11 @@ object HermesToolRuntime {
             listOf(
                 "list_files", "read_file", "read_file_part", "read_file_full",
                 "file_exists", "find_files", "file_info", "grep_code",
-                "calculate", "ffmpeg_info", "download_file"
+                "calculate", "ffmpeg_info"
             ).forEach { this[it] = Policy(concurrencySafe = true, timeoutMs = 45_000) }
+
+            // 下载会写文件，可能很大：串行、不设 deadline。
+            this["download_file"] = Policy(timeoutMs = null)
 
             // 网络读取可取消，但给更宽的 deadline。
             this["visit_web"] = Policy(concurrencySafe = true, timeoutMs = 90_000)
