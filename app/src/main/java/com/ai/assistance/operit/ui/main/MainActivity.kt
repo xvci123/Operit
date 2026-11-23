@@ -15,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.Observer
@@ -84,6 +86,10 @@ class MainActivity : ComponentActivity() {
     private var hermesBootReady by mutableStateOf(false)
     /** 协议/配置完成前不播放“飞向聊天页左上角”，避免承诺一个尚不存在的目的地。 */
     private var hermesOnboardingFinished by mutableStateOf(false)
+    /** Hermes：鲸鱼已落到左上角图标位置 —— 这时才开始组合 App 树，做 300ms 交接。 */
+    private var hermesSplashLanded by mutableStateOf(false)
+    /** Hermes：App 树已经摆上屏幕（onPlaced）。启动层等它出了第一帧才退底色。 */
+    private var hermesAppDrawn by mutableStateOf(false)
 
     private var lastOrientation: Int? = null
 
@@ -654,17 +660,15 @@ class MainActivity : ComponentActivity() {
 
     // ======== 设置应用内容 ========
     private fun setAppContent() {
+        // 重新 setContent 会重建整棵树：启动层若已经落地，就不要让动画再播一遍。
+        if (hermesSplashLanded) {
+            hermesSplashDone = true
+        }
         setContent {
-            if (!hermesBootReady || !hermesSplashDone) {
-                // 启动阶段只组合这一棵树，绝不组合整个 OperitApp。
-                HermesSplash(
-                        flyToHeader = hermesOnboardingFinished,
-                        hold = !hermesBootReady,
-                        onFinished = { hermesSplashDone = true }
-                )
-            } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+            if (hermesSplashLanded || hermesSplashDone) {
             OperitTheme {
-                Box {
+                Box(modifier = Modifier.onPlaced { hermesAppDrawn = true }) {
                     // 检查是否需要显示用户协议
                         if (!agreementPreferences.isAgreementAccepted()) {
                             AgreementScreen(
@@ -774,6 +778,17 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+            }
+            // 启动层压在最上面：鲸鱼已落在图标位置，这里只退底色。
+            if (!hermesSplashDone) {
+                HermesSplash(
+                        flyToHeader = hermesOnboardingFinished,
+                        hold = !hermesBootReady,
+                        appReady = hermesAppDrawn,
+                        onLanded = { hermesSplashLanded = true },
+                        onFinished = { hermesSplashDone = true }
+                )
+            }
             }
         }
     }

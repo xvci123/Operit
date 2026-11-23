@@ -10,13 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,14 +22,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.ai.assistance.operit.R
 import kotlin.math.PI
 import kotlin.math.cos
@@ -48,27 +41,26 @@ fun HermesParticleWhale(
     replayKey: String? = null
 ) {
     val context = LocalContext.current
-    val clock = remember { mutableFloatStateOf(0f) }
-    var resumeToken by remember { mutableIntStateOf(0) }
-    val lifecycleOwner = LocalLifecycleOwner.current
+    // 每个空对话 id 只在本次进程里播一次。
+    // 之前是监听 ON_RESUME 就 resumeToken++ 重播 —— 切后台回来、锁屏亮屏、
+    // 权限弹窗点掉、通知下拉回来都会莫名其妙重放一遍，这才是"乱触发"的来源。
+    val shouldPlay = remember(replayKey) { HermesWhalePlayback.claim(replayKey) }
+    val clock = remember { mutableFloatStateOf(if (shouldPlay) 0f else CHAT_ANIM_END_MS) }
     val targets = remember(particleCount) { sampleWhalePoints(context, particleCount) }
     val particles = remember(particleCount) { whaleParticles(particleCount) }
 
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) resumeToken++
+    LaunchedEffect(replayKey, shouldPlay) {
+        if (!shouldPlay) {
+            // 已经播过：直接停在最终帧，不闪、不重播。
+            clock.floatValue = CHAT_ANIM_END_MS
+            return@LaunchedEffect
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(replayKey, resumeToken) {
         clock.floatValue = 0f
         val startNanos = withFrameNanos { it }
         while (true) {
             val elapsed = (withFrameNanos { it } - startNanos) / 1_000_000f
             clock.floatValue = elapsed
-            if (elapsed >= 3400f) break
+            if (elapsed >= CHAT_ANIM_END_MS) break
         }
     }
 
@@ -198,6 +190,22 @@ private fun sampleWhalePoints(context: android.content.Context, count: Int): Lis
 }
 
 private val WHALE_SIZE = 124.dp
+
+private const val CHAT_ANIM_END_MS = 3400f
+
+/**
+ * 进程内播放闸门。
+ *
+ * 规则：每个空对话 id 各播一次，进程重启后计数清零。
+ * 刻意**不**跟随 Activity 生命周期 —— 只要跟着 ON_RESUME 走，动画就会在
+ * 任何一次回到前台时重放，用户感知就是"有时候莫名其妙又聚了一次"。
+ */
+private object HermesWhalePlayback {
+    private const val DEFAULT_KEY = "hermes-empty-chat"
+    private val played = mutableSetOf<String>()
+
+    fun claim(key: String?): Boolean = played.add(key ?: DEFAULT_KEY)
+}
 
 internal fun hermesRamp(now: Float, from: Float, to: Float): Float {
     if (to <= from) return if (now >= to) 1f else 0f
