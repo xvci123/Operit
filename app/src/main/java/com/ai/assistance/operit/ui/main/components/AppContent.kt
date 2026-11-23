@@ -193,7 +193,9 @@ fun AppContent(
     val appBarContentColorMode = themeSnapshot.appBarContentColorMode
 
     val appBarContentColor =
-            if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) {
+            if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) {
+                MaterialTheme.colorScheme.onBackground
+            } else if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) {
                 MaterialTheme.colorScheme.onBackground
             } else if (forceAppBarContentColor) {
                 when (appBarContentColorMode) {
@@ -362,6 +364,8 @@ fun AppContent(
                     TopAppBarDefaults.topAppBarColors(
                         containerColor =
                         when {
+                            com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK ->
+                                MaterialTheme.colorScheme.background
                             toolbarTransparent -> Color.Transparent
                             useCustomAppBarColor && customAppBarColor != null -> Color(customAppBarColor)
                             com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT ->

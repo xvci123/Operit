@@ -18,9 +18,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,33 +26,34 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.ai.assistance.operit.R
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
 
-/**
- * 聊天空态：粒子先汇成与 PNG 完全同形的鲸鱼，实体淡入后只跃动一次，文字浮出，随后静止。
- * 采样点使用图片自身的 0..1 坐标，在 Canvas 内映射到固定 124dp 方框，绝不乘屏幕宽高。
- */
+/** 星光只从散点直接汇成鲸鱼，不经过中心圆、光环或其他中间图形。 */
 @Composable
 fun HermesParticleWhale(
     modifier: Modifier = Modifier,
-    particleCount: Int = 320,
+    particleCount: Int = 520,
     replayKey: String? = null
 ) {
     val context = LocalContext.current
     val clock = remember { mutableFloatStateOf(0f) }
     var resumeToken by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val targets = remember(particleCount) { sampleWhalePoints(context, particleCount) }
+    val particles = remember(particleCount) { whaleParticles(particleCount) }
 
-    // 每次回到宠物/聊天页都重播一次星光汇聚，而不是只在本组合第一次进入时播放。
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) resumeToken++
@@ -64,32 +62,17 @@ fun HermesParticleWhale(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val targets = remember(particleCount) { sampleWhalePoints(context, particleCount) }
-    val starts = remember(particleCount) {
-        val rnd = Random(20261122)
-        List(particleCount) {
-            val angle = rnd.nextFloat() * (2f * PI.toFloat())
-            val dist = 0.42f + rnd.nextFloat() * 0.38f
-            ParticleStart(
-                offset = Offset(0.5f + cos(angle) * dist, 0.5f + sin(angle) * dist),
-                delayMs = rnd.nextFloat() * 240f,
-                phase = rnd.nextFloat()
-            )
-        }
-    }
-
     LaunchedEffect(replayKey, resumeToken) {
         clock.floatValue = 0f
         val startNanos = withFrameNanos { it }
         while (true) {
-            val elapsedMs = (withFrameNanos { it } - startNanos) / 1_000_000f
-            clock.floatValue = elapsedMs
-            if (elapsedMs >= FINISH_MS) break
+            val elapsed = (withFrameNanos { it } - startNanos) / 1_000_000f
+            clock.floatValue = elapsed
+            if (elapsed >= 3400f) break
         }
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        // 整体上移，避免鲸鱼落在屏幕下半部；留白只用于定位，不改聊天业务布局。
         Column(
             modifier = Modifier.padding(bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -97,43 +80,35 @@ fun HermesParticleWhale(
             Box(contentAlignment = Alignment.Center) {
                 Canvas(modifier = Modifier.size(WHALE_SIZE)) {
                     val now = clock.floatValue
-                    val toShape = easeOutCubic(ramp(now, 1100f, 2000f))
-                    val whaleAlpha = ramp(now, 1950f, 2350f)
-                    val particlesAlpha = 1f - whaleAlpha
-                    val dotRadius = (size.minDimension * 0.009f).coerceIn(1.1f, 2.4f)
+                    val shapeProgress = ramp(now, 300f, 1750f)
+                    val whaleAlpha = ramp(now, 1550f, 2050f)
+                    val particlesAlpha = 1f - ramp(now, 1650f, 2150f)
+                    val radius = size.minDimension * 0.009f
+                    val gather = easeInOutCubic(shapeProgress)
 
                     targets.forEachIndexed { index, target ->
-                        val particle = starts[index]
-                        val local = easeOutCubic(
-                            ((now - particle.delayMs) / 1100f).coerceIn(0f, 1f)
-                        )
-                        val cloudX = 0.5f + cos(particle.phase * 6.283f) * 0.075f
-                        val cloudY = 0.5f + sin(particle.phase * 6.283f) * 0.075f
-                        val cx = particle.offset.x + (cloudX - particle.offset.x) * local
-                        val cy = particle.offset.y + (cloudY - particle.offset.y) * local
+                        val particle = particles[index]
+                        val local = ramp(now, particle.delayMs, 1450f + particle.delayMs)
+                        val progress = easeInOutCubic(local)
+                        val drift = (1f - progress) * sin(now * 0.002f + particle.phase * 6.283f) * 0.012f
+                        val x = particle.start.x + (target.x - particle.start.x) * progress + drift
+                        val y = particle.start.y + (target.y - particle.start.y) * progress + drift * 0.6f
+                        val appear = ramp(now, 0f, 240f + particle.delayMs)
                         drawCircle(
-                            color = Color.White.copy(
-                                alpha = (0.24f + 0.66f * local) * particlesAlpha
-                            ),
-                            radius = dotRadius * (0.65f + 0.65f * particle.phase),
-                            center = Offset(
-                                (cx + (target.x - cx) * toShape) * size.width,
-                                (cy + (target.y - cy) * toShape) * size.height
-                            )
+                            color = Color.White.copy(alpha = (0.35f + particle.phase * 0.65f) * appear * particlesAlpha),
+                            radius = radius * (0.55f + particle.phase * 0.85f) * (0.75f + gather * 0.25f),
+                            center = Offset(x * size.width, y * size.height)
                         )
                     }
 
                     if (whaleAlpha > 0f) {
-                        val radius = size.minDimension * 0.64f
+                        val glowRadius = size.minDimension * 0.58f
                         drawCircle(
                             brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.07f * whaleAlpha),
-                                    Color.Transparent
-                                ),
-                                radius = radius
+                                colors = listOf(Color.White.copy(alpha = 0.045f * whaleAlpha), Color.Transparent),
+                                radius = glowRadius
                             ),
-                            radius = radius
+                            radius = glowRadius
                         )
                     }
                 }
@@ -143,15 +118,12 @@ fun HermesParticleWhale(
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.size(WHALE_SIZE).graphicsLayer {
-                        val now = clock.floatValue
-                        alpha = 0.9f * ramp(now, 1950f, 2350f)
-                        // 只有一次：向上再落回原点。之后恒为 0，不再循环跳动。
-                        val bounce = ramp(now, 2350f, 3000f)
-                        translationY = -sin(bounce * PI.toFloat()) * 12.dp.toPx()
+                        alpha = ramp(clock.floatValue, 1550f, 2050f)
+                        val bounce = ramp(clock.floatValue, 2100f, 2650f)
+                        translationY = -sin(bounce * PI.toFloat()) * 10.dp.toPx()
                     }
                 )
             }
-
             Text(
                 text = stringResource(R.string.hermes_tagline),
                 color = HermesTokens.Palette.text,
@@ -159,7 +131,7 @@ fun HermesParticleWhale(
                 fontWeight = FontWeight.Light,
                 letterSpacing = 8.sp,
                 modifier = Modifier.padding(top = 24.dp).graphicsLayer {
-                    val appear = easeOutCubic(ramp(clock.floatValue, 2750f, 3300f))
+                    val appear = easeOutCubic(ramp(clock.floatValue, 2450f, 3050f))
                     alpha = appear
                     translationY = 12.dp.toPx() * (1f - appear)
                 }
@@ -168,21 +140,48 @@ fun HermesParticleWhale(
     }
 }
 
-private val WHALE_SIZE = 124.dp
-private const val FINISH_MS = 3400f
+internal data class WhaleParticle(
+    val start: Offset,
+    val delayMs: Float,
+    val phase: Float
+)
 
-private data class ParticleStart(val offset: Offset, val delayMs: Float, val phase: Float)
+/** 椭圆区域内的独立散点。目标直接取自鲸鱼 alpha，没有圆周/圆环阶段。 */
+internal fun whaleParticles(count: Int): List<WhaleParticle> {
+    val random = Random(20261123)
+    return List(count) {
+        val angle = random.nextFloat() * 2f * PI.toFloat()
+        val distance = kotlin.math.sqrt(random.nextFloat())
+        WhaleParticle(
+            start = Offset(
+                0.5f + cos(angle) * distance * 0.68f,
+                0.5f + sin(angle) * distance * 0.72f
+            ),
+            delayMs = random.nextFloat() * 300f,
+            phase = random.nextFloat()
+        )
+    }
+}
 
-/** 从 alpha 通道无重复抽样，保留轮廓和内部空白；失败时也不能拿椭圆冒充鲸鱼。 */
+/** 对外保留完整鲸鱼内容；聚鲸由画布负责，绝不显示一个先出现的静态 logo。 */
+@Composable
+fun HermesWhaleImage(modifier: Modifier, alpha: Float = 1f) {
+    Image(
+        painter = painterResource(id = R.drawable.whale_alpha),
+        contentDescription = null,
+        contentScale = ContentScale.Fit,
+        modifier = modifier.graphicsLayer { this.alpha = alpha }
+    )
+}
+
 private fun sampleWhalePoints(context: android.content.Context, count: Int): List<Offset> {
     val bitmap = try {
         BitmapFactory.decodeResource(context.resources, R.drawable.whale_alpha)
     } catch (_: Exception) {
         null
     } ?: return emptyList()
-
-    val candidates = ArrayList<Offset>(2048)
-    val step = maxOf(2, minOf(bitmap.width, bitmap.height) / 100)
+    val candidates = ArrayList<Offset>(4096)
+    val step = maxOf(1, minOf(bitmap.width, bitmap.height) / 140)
     var y = 0
     while (y < bitmap.height) {
         var x = 0
@@ -195,15 +194,26 @@ private fun sampleWhalePoints(context: android.content.Context, count: Int): Lis
         y += step
     }
     bitmap.recycle()
-    if (candidates.isEmpty()) return emptyList()
     return candidates.shuffled(Random(7)).take(count)
 }
 
-private fun ramp(now: Float, from: Float, to: Float): Float {
+private val WHALE_SIZE = 124.dp
+
+internal fun hermesRamp(now: Float, from: Float, to: Float): Float {
+    if (to <= from) return if (now >= to) 1f else 0f
     return ((now - from) / (to - from)).coerceIn(0f, 1f)
 }
 
-private fun easeOutCubic(x: Float): Float {
+private fun ramp(now: Float, from: Float, to: Float) = hermesRamp(now, from, to)
+
+internal fun hermesEaseOut(x: Float): Float {
     val t = 1f - x
     return 1f - t * t * t
 }
+
+internal fun hermesEaseInOut(x: Float): Float =
+    if (x < 0.5f) 4f * x * x * x
+    else 1f - ((-2f * x + 2f) * (-2f * x + 2f) * (-2f * x + 2f)) / 2f
+
+private fun easeOutCubic(x: Float) = hermesEaseOut(x)
+private fun easeInOutCubic(x: Float) = hermesEaseInOut(x)

@@ -195,8 +195,8 @@ class MainActivity : ComponentActivity() {
 
         // Set window background to solid color to prevent system theme leaking through
         window.setBackgroundDrawableResource(R.drawable.hermes_splash_window)
-        window.statusBarColor = android.graphics.Color.rgb(21, 23, 27)
-        window.navigationBarColor = android.graphics.Color.rgb(21, 23, 27)
+        window.statusBarColor = android.graphics.Color.rgb(23, 23, 23)
+        window.navigationBarColor = android.graphics.Color.rgb(23, 23, 23)
 
         // 状态栏配色统一在 ui/theme/Theme.kt 的 SideEffect 里按主题色算，
         // 这里不要再设一遍（会被那边的 SideEffect 覆盖，两处来源只会互相打架）。

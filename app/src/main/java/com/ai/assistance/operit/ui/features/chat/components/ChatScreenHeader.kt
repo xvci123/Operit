@@ -155,8 +155,8 @@ fun ChatScreenHeader(
                         }
             }
 
-    val headerShape = RoundedCornerShape(24.dp)
-    val hermesLight = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT
+    val headerShape = RoundedCornerShape(if (hermesDark) 0.dp else 24.dp)
+    val hermesDark = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
     Row(
             modifier =
                     modifier
@@ -164,12 +164,12 @@ fun ChatScreenHeader(
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                             .background(
                                     if (chatHeaderTransparent) Color.Transparent
-                                    else if (hermesLight) MaterialTheme.colorScheme.surface
+                                    else if (hermesDark) MaterialTheme.colorScheme.surface
                                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
                                     headerShape
                             )
                             .border(
-                                    width = if (hermesLight && !chatHeaderTransparent) 1.dp else 0.dp,
+                                    width = if (hermesDark && !chatHeaderTransparent) 1.dp else 0.dp,
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.8f),
                                     shape = headerShape
                             )

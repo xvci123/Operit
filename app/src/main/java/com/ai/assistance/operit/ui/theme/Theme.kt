@@ -71,28 +71,34 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 
-private val HermesLightColorScheme =
-        lightColorScheme(
-                primary = HermesTokens.Light.primary,
-                onPrimary = Color.White,
-                primaryContainer = Color(0xFFDCE7FF),
-                onPrimaryContainer = Color(0xFF15346E),
-                secondary = Color(0xFF5F6F8F),
-                onSecondary = Color.White,
-                background = HermesTokens.Light.bg,
-                onBackground = HermesTokens.Light.text,
-                surface = HermesTokens.Light.surface,
-                onSurface = HermesTokens.Light.text,
-                surfaceVariant = HermesTokens.Light.surfaceHigh,
-                onSurfaceVariant = HermesTokens.Light.textSecondary,
-                surfaceContainerLowest = HermesTokens.Light.bg,
-                surfaceContainerLow = HermesTokens.Light.surface,
-                surfaceContainer = HermesTokens.Light.surface,
-                surfaceContainerHigh = HermesTokens.Light.surfaceHigh,
-                surfaceContainerHighest = HermesTokens.Light.surfaceHigh,
-                outline = HermesTokens.Light.outline,
-                outlineVariant = HermesTokens.Light.outline,
-                error = HermesTokens.Light.danger,
+private val HermesDarkColorScheme =
+        darkColorScheme(
+                primary = HermesTokens.Palette.primary,
+                onPrimary = Color(0xFF111318),
+                primaryContainer = HermesTokens.Palette.primaryDeep,
+                onPrimaryContainer = Color(0xFFDCE8FF),
+                secondary = Color(0xFFA7ADB9),
+                onSecondary = Color(0xFF171717),
+                secondaryContainer = HermesTokens.Palette.surfaceHigh,
+                onSecondaryContainer = HermesTokens.Palette.text,
+                tertiary = HermesTokens.Palette.accent,
+                onTertiary = Color(0xFF171717),
+                background = HermesTokens.Palette.bg,
+                onBackground = HermesTokens.Palette.text,
+                surface = HermesTokens.Palette.surface,
+                onSurface = HermesTokens.Palette.text,
+                surfaceVariant = HermesTokens.Palette.surfaceHigh,
+                onSurfaceVariant = HermesTokens.Palette.textSecondary,
+                surfaceContainerLowest = HermesTokens.Palette.bg,
+                surfaceContainerLow = HermesTokens.Palette.bg,
+                surfaceContainer = HermesTokens.Palette.surface,
+                surfaceContainerHigh = HermesTokens.Palette.surfaceHigh,
+                surfaceContainerHighest = HermesTokens.Palette.surfaceHigh,
+                inverseSurface = HermesTokens.Palette.text,
+                inverseOnSurface = HermesTokens.Palette.bg,
+                outline = HermesTokens.Palette.outline,
+                outlineVariant = HermesTokens.Palette.outline,
+                error = HermesTokens.Palette.danger,
         )
 
 private val DarkColorScheme =
@@ -193,8 +199,8 @@ fun OperitTheme(content: @Composable () -> Unit) {
     // 基础主题色调
     var colorScheme =
             when {
-                com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT ->
-                        HermesLightColorScheme
+                com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK ->
+                        HermesDarkColorScheme
                 dynamicColor -> {
                     if (darkTheme) dynamicDarkColorScheme(context)
                     else dynamicLightColorScheme(context)
@@ -204,7 +210,9 @@ fun OperitTheme(content: @Composable () -> Unit) {
             }
 
     // 应用自定义颜色和文本颜色（浅色皮肤期间不让旧的深色自定义偏好覆盖）
-    if (useCustomColors && !com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) {
+    if (useCustomColors &&
+        !com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT &&
+        !com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) {
         customPrimaryColor?.let { primaryArgb ->
             val primary = Color(primaryArgb)
             val secondary = customSecondaryColor?.let { Color(it) } ?: colorScheme.secondary
@@ -394,7 +402,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .background(if (darkTheme) colorScheme.background else Color.White)
+                            .background(colorScheme.background)
                             .then(
                                 if (waterGlassState != null) {
                                     Modifier.liquefiable(waterGlassState)

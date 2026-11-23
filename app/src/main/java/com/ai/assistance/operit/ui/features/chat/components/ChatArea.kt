@@ -418,7 +418,7 @@ fun ChatArea(
             modifier
                 .background(
                     if (com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK)
-                        Color(0xFF0F1012)
+                        com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.bg
                     else Color.Transparent
                 )
                 .onGloballyPositioned { coordinates ->

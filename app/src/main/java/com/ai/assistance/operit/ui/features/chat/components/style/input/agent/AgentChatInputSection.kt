@@ -505,7 +505,7 @@ fun AgentChatInputSection(
     val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val darkModeInputColor =
         if (hermesSkin) {
-            com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh
+            com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surface
         } else {
             lerp(
                 MaterialTheme.colorScheme.surface,
@@ -784,7 +784,10 @@ fun AgentChatInputSection(
                     MaterialTheme.colorScheme.surface
                 }
             val inputContainerEffectModifier =
-                if (isDarkTheme) {
+                if (hermesSkin) {
+                    // DSHA 灰卡片只保留细分隔线，不再出现贯穿整框的亮白高光。
+                    Modifier
+                } else if (isDarkTheme) {
                     Modifier.topEdgeHighlight(
                         shape = inputCardShape,
                         lineColor =

@@ -34,17 +34,18 @@ object HermesTokens {
      * 与 `HermesSkin` 保持同值（那边是写进偏好种子的 Int，这边是 Compose Color）。
      */
     object Palette {
-        val bg = Color(0xFF15171B)
-        val bgGlow = Color(0xFF1A1D22)
-        val surface = Color(0xFF1E2127)
-        val surfaceHigh = Color(0xFF282C34)
-        val outline = Color(0xFF3A3F4A)
-        val text = Color(0xFFF0F2F6)
-        val textSecondary = Color(0xFFA6ACB8)
-        val textMuted = Color(0xFF78808F)
-        val primary = Color(0xFF4C8DFF)
-        val primaryDeep = Color(0xFF1E3A6E)
-        val accent = Color(0xFF7BD3FF)
+        // 对齐 DSHA 截图：页面近黑灰，卡片和控件逐级变亮，不使用纯黑大块。
+        val bg = Color(0xFF171717)
+        val bgGlow = Color(0xFF1B1B1D)
+        val surface = Color(0xFF202022)
+        val surfaceHigh = Color(0xFF2A2A2D)
+        val outline = Color(0xFF3A3A3E)
+        val text = Color(0xFFF0F0F2)
+        val textSecondary = Color(0xFFA6A6AD)
+        val textMuted = Color(0xFF74747C)
+        val primary = Color(0xFF74A7FF)
+        val primaryDeep = Color(0xFF28374D)
+        val accent = Color(0xFF8AB4FF)
         val danger = Color(0xFFE5534B)
         val success = Color(0xFF4CB782)
 
