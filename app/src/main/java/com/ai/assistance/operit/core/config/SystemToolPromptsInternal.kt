@@ -637,10 +637,9 @@ object SystemToolPromptsInternal {
                     listOf(
                         ToolPrompt(
                             name = "ask_user",
-                            description = "Ask the user a question and wait for an answer (default 120s). Use it only when a choice or missing information blocks progress. Returns ANSWER / TIMEOUT / DISMISSED / BACKGROUND / STOPPED. If TIMEOUT, do not assume the user agreed.",
+                            description = "Ask the user one or more questions and wait for a batch answer (default 120s). Use it only when choices or missing information block progress. `questions` is a JSON array; each item has a stable unique id, question, optional header, optional options [{label, description}], and multi_select. Returns compact JSON {\"answers\":[{\"id\",\"selected\":[...],\"custom\"?}]} or TIMEOUT / DISMISSED / BACKGROUND / STOPPED. If TIMEOUT, do not assume the user agreed.",
                             parametersStructured = listOf(
-                                ToolParameterSchema(name = "question", type = "string", description = "required, the question to ask", required = true),
-                                ToolParameterSchema(name = "options", type = "string", description = "optional, up to 3 options separated by |", required = false),
+                                ToolParameterSchema(name = "questions", type = "array", description = "required, JSON array of question objects: [{id, question, header?, options?: [{label, description?}], multi_select?}]. Ask several independent questions in one call; ids must be unique", required = true),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, default 120000", required = false)
                             )
                         ),
@@ -3694,10 +3693,9 @@ object SystemToolPromptsInternal {
                     listOf(
                         ToolPrompt(
                             name = "ask_user",
-                            description = "向用户提一个问题并等待回答（默认 120 秒）。仅在需要用户做选择或缺少关键信息时使用。返回 ANSWER / TIMEOUT / DISMISSED / BACKGROUND / STOPPED；若为 TIMEOUT，不要假设用户已同意。",
+                            description = "向用户提出一个或多个问题，并等待整批回答（默认 120 秒）。仅在需要用户做选择或缺少关键信息时使用。`questions` 是 JSON 数组，每项含唯一 id、question、可选 header、可选 options（[{label, description}]）和 multi_select。返回紧凑 JSON {\"answers\":[{\"id\",\"selected\":[...],\"custom\"?}]} 或 TIMEOUT / DISMISSED / BACKGROUND / STOPPED；若为 TIMEOUT，不要假设用户已同意。",
                             parametersStructured = listOf(
-                                ToolParameterSchema(name = "question", type = "string", description = "必填，要问的问题", required = true),
-                                ToolParameterSchema(name = "options", type = "string", description = "可选，最多 3 个选项，用 | 分隔", required = false),
+                                ToolParameterSchema(name = "questions", type = "array", description = "必填，JSON 数组：[{id, question, header?, options?: [{label, description?}], multi_select?}]。一次可以问多个独立问题；id 在本次调用内必须唯一", required = true),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，默认 120000", required = false)
                             )
                         ),

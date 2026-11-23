@@ -1417,8 +1417,10 @@ fun registerAllTools(handler: AIToolHandler, context: Context) {
     handler.registerTool(
             name = AskUserToolExecutor.TOOL_NAME,
             descriptionGenerator = { tool ->
-                val question = tool.parameters.find { it.name == "question" }?.value ?: ""
-                "Ask user: $question"
+                val raw = tool.parameters.find { it.name == "questions" }?.value
+                    ?: tool.parameters.find { it.name == "question" }?.value
+                    ?: ""
+                "Ask user: ${raw.take(160)}"
             },
             executor = AskUserToolExecutor()
     )

@@ -96,6 +96,28 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
                     radius = size.width * (0.22f + 0.25f * lightIn)
                 )
 
+                // 斜向光扫：参考图要的“开场有一道光线”。峰值只有 0.10，
+                // 并且是窄带渐变，不是整屏刷白；两端全透明，不会露矩形边。
+                val sweep = ramp(now, 0f, 1150f)
+                if (sweep > 0f && sweep < 1f) {
+                    val w = size.width
+                    val h = size.height
+                    val band = w * 0.52f
+                    val cx = -band + (w + band * 2f) * sweep
+                    val peak = 0.10f * kotlin.math.sin(sweep * kotlin.math.PI.toFloat())
+                    drawRect(
+                        brush = Brush.linearGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                Color.White.copy(alpha = peak),
+                                Color.Transparent
+                            ),
+                            start = Offset(cx - band, -h * 0.15f),
+                            end = Offset(cx + band, h * 1.15f)
+                        )
+                    )
+                }
+
                 // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。
                 val gather = easeOutCubic(ramp(now, 900f, 1550f))
                 if (gather > 0f) {
@@ -127,7 +149,7 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
                     val now = clock.floatValue
                     val rise = easeOutCubic(ramp(now, 0f, 650f))
                     val fly = if (flyToHeader) {
-                        easeInOutCubic(ramp(now, 1650f, 2150f))
+                        easeInOutCubic(ramp(now, 1750f, 2200f))
                     } else {
                         0f
                     }
@@ -142,23 +164,23 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
             )
 
             Box(modifier = Modifier.padding(top = 28.dp)) {
-                Box(
-                    modifier = Modifier.graphicsLayer {
-                        alpha = 1f - ramp(clock.floatValue, 1550f, 1770f)
-                    }
-                ) {
+                Box {
                     FlipWord(
                         word = "DEEPSEEK",
                         clock = clock,
-                        startMs = 520f,
-                        staggerMs = 34f,
+                        startMs = 480f,
+                        staggerMs = 30f,
+                        fadeOutFrom = 1100f,
+                        fadeOutTo = 1280f,
                         hollow = false
                     )
                     FlipWord(
                         word = "HARNESS",
                         clock = clock,
-                        startMs = 1050f,
-                        staggerMs = 38f,
+                        startMs = 1250f,
+                        staggerMs = 32f,
+                        fadeOutFrom = 1720f,
+                        fadeOutTo = 1900f,
                         hollow = true
                     )
                 }
@@ -169,13 +191,15 @@ fun HermesSplash(flyToHeader: Boolean, onFinished: () -> Unit) {
 
 private const val TOTAL_MS = 2400f
 
-/** [clock] 传 State 本身，组合阶段不读值。两个词错峰出现，并共享足够的可见窗口。 */
+/** [clock] 传 State 本身，组合阶段不读值。两个词先后替换，不并排重叠。 */
 @Composable
 private fun FlipWord(
     word: String,
     clock: State<Float>,
     startMs: Float,
     staggerMs: Float,
+    fadeOutFrom: Float,
+    fadeOutTo: Float,
     hollow: Boolean
 ) {
     Row {
@@ -193,9 +217,11 @@ private fun FlipWord(
                     val local = ((clock.value - startMs - index * staggerMs) / 240f)
                         .coerceIn(0f, 1f)
                     val eased = easeOutCubic(local)
+                    val fadeOut = if (fadeOutTo <= fadeOutFrom) 1f
+                        else 1f - ramp(clock.value, fadeOutFrom, fadeOutTo)
                     rotationY = (1f - eased) * 88f
                     cameraDistance = 14f * density
-                    alpha = eased
+                    alpha = eased * fadeOut
                 }
             )
         }

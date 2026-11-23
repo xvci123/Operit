@@ -224,7 +224,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 // 根据状态栏背景色动态设置状态栏图标颜色
                 // isAppearanceLightStatusBars = true 表示图标为深色（适用于浅色背景）
                 // isAppearanceLightStatusBars = false 表示图标为浅色（适用于深色背景）
-                insetsController?.isAppearanceLightStatusBars = !isColorLight(Color(statusBarColor))
+                insetsController?.isAppearanceLightStatusBars = isColorLight(Color(statusBarColor))
             }
             
             // 设置导航栏颜色（底部小白条所在的区域）
@@ -247,7 +247,7 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 // 根据导航栏背景色动态设置导航栏图标颜色
                 // isAppearanceLightNavigationBars = true 表示图标为深色（适用于浅色背景）
                 // isAppearanceLightNavigationBars = false 表示图标为浅色（适用于深色背景）
-                insetsController?.isAppearanceLightNavigationBars = !isColorLight(colorScheme.background)
+                insetsController?.isAppearanceLightNavigationBars = isColorLight(colorScheme.background)
             }
         }
     }
