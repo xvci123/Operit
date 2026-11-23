@@ -426,7 +426,8 @@ fun ChatArea(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 // 粒子鲸鱼：汇聚 1.5s → 停顿 1s → 拼成鲸鱼 → 弹动 → 文字浮出
                 com.ai.assistance.operit.ui.hermes.HermesParticleWhale(
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        replayKey = currentChatId
                 )
             }
         }

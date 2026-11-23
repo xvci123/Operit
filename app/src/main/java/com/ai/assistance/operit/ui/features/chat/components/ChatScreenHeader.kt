@@ -5,7 +5,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.material3.*
@@ -153,15 +155,26 @@ fun ChatScreenHeader(
                         }
             }
 
+    val headerShape = RoundedCornerShape(24.dp)
+    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
     Row(
             modifier =
                     modifier
                             .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                             .background(
                                     if (chatHeaderTransparent) Color.Transparent
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+                                    else if (hermesSkin)
+                                            com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surface.copy(alpha = 0.94f)
+                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+                                    headerShape
                             )
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                            .border(
+                                    width = if (hermesSkin && !chatHeaderTransparent) 1.dp else 0.dp,
+                                    color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.outline.copy(alpha = 0.8f),
+                                    shape = headerShape
+                            )
+                            .padding(horizontal = 12.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {

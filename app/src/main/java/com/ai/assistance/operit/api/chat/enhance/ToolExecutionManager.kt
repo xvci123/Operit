@@ -867,6 +867,7 @@ object ToolExecutionManager {
                 val result =
                     executeTool(
                         invocation = invocation,
+                        context = context,
                         toolHandler = toolHandler,
                         packageManager = packageManager,
                         runtimeContext = toolRuntimeContext
@@ -880,6 +881,7 @@ object ToolExecutionManager {
             val result =
                 executeTool(
                     invocation = invocation,
+                    context = context,
                     toolHandler = toolHandler,
                     packageManager = packageManager,
                     runtimeContext = toolRuntimeContext
@@ -898,6 +900,7 @@ object ToolExecutionManager {
      */
     private suspend fun executeTool(
         invocation: ToolInvocation,
+        context: Context,
         toolHandler: AIToolHandler,
         packageManager: PackageManager,
         runtimeContext: ToolRuntimeContext
@@ -969,12 +972,14 @@ object ToolExecutionManager {
                 val annotated = if (subtask == null) {
                     collectWithDeadline(
                         displayToolName,
+                        context,
                         executeToolSafely(invocation, executor, toolHandler)
                     )
                 } else {
-                    collectSubtaskToolResult(subtask, resolveSubtaskTarget(invocation.tool), displayToolName) {
+                    val result = collectSubtaskToolResult(subtask, resolveSubtaskTarget(invocation.tool), displayToolName) {
                         executeToolSafely(invocation, executor, toolHandler, parametersValidated = true)
                     }
+                    applyResultLimit(displayToolName, context, result)
                 }
                 toolHandler.notifyToolExecutionResult(invocation.tool, annotated)
                 return@withContext annotated
@@ -1024,11 +1029,20 @@ object ToolExecutionManager {
         return ToolResult(
             toolName = displayToolName,
             success = lastResult.success,
-            result = StringResultData(
-                HermesToolRuntime.limitForModel(displayToolName, combinedResultString)
-            ),
+            result = StringResultData(combinedResultString),
             error = lastResult.error
         )
+    }
+
+    /** 模型边界统一截断；完整内容写 spill 文件，把路径交给模型。 */
+    private fun applyResultLimit(
+        displayToolName: String,
+        context: Context,
+        result: ToolResult
+    ): ToolResult {
+        val text = result.result.toString()
+        val limited = HermesToolRuntime.limitForModelWithSpill(context, displayToolName, text)
+        return if (limited == text) result else result.copy(result = StringResultData(limited))
     }
 
     /**
@@ -1037,13 +1051,18 @@ object ToolExecutionManager {
      */
     private suspend fun collectWithDeadline(
         displayToolName: String,
+        context: Context,
         source: Flow<ToolResult>
     ): ToolResult {
         val deadline = HermesToolRuntime.deadlineMs(displayToolName)
-            ?: return aggregateToolResults(displayToolName, source)
-        return withTimeoutOrNull(deadline) {
+        val result = if (deadline == null) {
             aggregateToolResults(displayToolName, source)
-        } ?: HermesToolRuntime.timeoutResult(displayToolName, deadline)
+        } else {
+            withTimeoutOrNull(deadline) {
+                aggregateToolResults(displayToolName, source)
+            } ?: HermesToolRuntime.timeoutResult(displayToolName, deadline)
+        }
+        return applyResultLimit(displayToolName, context, result)
     }
 
     /**

@@ -495,16 +495,22 @@ fun AgentChatInputSection(
     }
 
     val isDarkTheme = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
+    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
     val darkModeInputColor =
-        lerp(
-            MaterialTheme.colorScheme.surface,
-            MaterialTheme.colorScheme.onSurface,
-            0.08f,
-        )
+        if (hermesSkin) {
+            com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh
+        } else {
+            lerp(
+                MaterialTheme.colorScheme.surface,
+                MaterialTheme.colorScheme.onSurface,
+                0.08f,
+            )
+        }
 
     val inputContainerColor =
         when {
             chatInputTransparent -> Color.Transparent
+            hermesSkin -> darkModeInputColor
             isDarkTheme && hasBackgroundImage -> darkModeInputColor.copy(alpha = 0.82f)
             isDarkTheme -> darkModeInputColor
             hasBackgroundImage -> MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
@@ -646,7 +652,9 @@ fun AgentChatInputSection(
         }
 
     val floatingContainerModifier =
-        if (chatInputFloating) {
+        if (hermesSkin) {
+            modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        } else if (chatInputFloating) {
             modifier.padding(horizontal = 8.dp, vertical = 6.dp)
         } else {
             modifier
@@ -751,7 +759,9 @@ fun AgentChatInputSection(
             }
 
             val inputCardShape =
-                if (chatInputFloating) {
+                if (hermesSkin) {
+                    RoundedCornerShape(28.dp)
+                } else if (chatInputFloating) {
                     RoundedCornerShape(22.dp)
                 } else {
                     RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
@@ -889,17 +899,17 @@ fun AgentChatInputSection(
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent,
+                                shape = RoundedCornerShape(999.dp),
+                                color = if (hermesSkin) com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh else Color.Transparent,
                                 modifier =
                                     Modifier
                                         .widthIn(min = 0.dp, max = 220.dp)
                                         .border(
                                             width = 1.dp,
-                                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (hermesSkin) com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.outline else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                            shape = RoundedCornerShape(999.dp),
                                         )
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(999.dp))
                                         .clickable(onClick = onModelSelectorClick),
                             ) {
                                 Row(
@@ -1189,17 +1199,17 @@ fun AgentChatInputSection(
                                 contentAlignment = Alignment.CenterStart,
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = Color.Transparent,
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = if (hermesSkin) com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh else Color.Transparent,
                                     modifier =
                                         Modifier
                                             .widthIn(min = 0.dp, max = 220.dp)
                                             .border(
                                                 width = 1.dp,
-                                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                                                shape = RoundedCornerShape(12.dp),
+                                                color = if (hermesSkin) com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.outline else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(999.dp),
                                             )
-                                            .clip(RoundedCornerShape(12.dp))
+                                            .clip(RoundedCornerShape(999.dp))
                                             .clickable(onClick = onModelSelectorClick),
                                 ) {
                                     Row(

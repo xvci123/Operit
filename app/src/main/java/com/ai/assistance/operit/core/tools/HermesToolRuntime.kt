@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.core.tools
 
+import android.content.Context
 import com.ai.assistance.operit.data.model.ToolResult
+import java.io.File
 
 /**
  * P-B 工具运行时策略（DSHA ToolDescriptor 的 Kotlin 对应物）。
@@ -83,6 +85,28 @@ object HermesToolRuntime {
             append(" chars; use a paged/read tool for the omitted middle]\n\n")
             append(tail)
         }
+    }
+
+    /**
+     * 大结果全文落盘到 cache/hermes/tool-spill，再把路径交给模型。
+     * 失败时退化为纯截断，不能让 spill 本身把工具结果变成错误。
+     */
+    fun limitForModelWithSpill(
+        context: Context,
+        toolName: String,
+        text: String
+    ): String {
+        if (text.length <= maxResultChars(toolName)) return text
+        val path = runCatching {
+            val dir = File(context.cacheDir, "hermes/tool-spill").apply { mkdirs() }
+            val safeName = toolName.replace(Regex("[^A-Za-z0-9._-]"), "_").take(48)
+            val file = File(dir, "${System.currentTimeMillis()}-$safeName.txt")
+            file.writeText(text)
+            file.absolutePath
+        }.getOrNull()
+        val limited = limitForModel(toolName, text)
+        return if (path == null) limited
+        else "$limited\n\n[full output: $path]"
     }
 
     fun timeoutResult(toolName: String, timeoutMs: Long): ToolResult {

@@ -37,7 +37,8 @@ import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
 
 /**
- * Hermes 冷启动动画。系统启动窗负责首帧之前的静态鲸鱼，本层负责接管后的动效。
+ * Hermes 冷启动动画。系统启动窗只铺与这里相同的底色，不预画鲸鱼，
+ * 避免“先出现一张静态鲸鱼，再跳成动画”的割裂。
  *
  * [flyToHeader] 只有即将进入聊天主界面时才为 true。协议或权限配置尚未完成时，
  * 鲸鱼原地淡出，不会飞向一个尚未出现的聊天顶栏。
@@ -81,40 +82,26 @@ fun HermesSplash(
         val startSize = 148.dp
         val endSize = 22.dp
 
-        // 局部柔光，而不是覆盖全屏的白色渐变。任何一帧都不会把整屏刷白。
+        // 背景层。扫光必须独立于径向光的 strength：否则 strength=0 时整段光都被跳过。
         Box(
             modifier = Modifier.fillMaxSize().drawBehind {
                 val now = clock.floatValue
+                val w = size.width
+                val h = size.height
+                val center = Offset(w / 2f, h / 2f - 32.dp.toPx())
                 val lightIn = ramp(now, 0f, 420f)
                 val lightOut = 1f - ramp(now, 850f, 1250f)
                 val strength = lightIn * lightOut
-                if (strength <= 0f) return@drawBehind
-                val center = Offset(size.width / 2f, size.height / 2f - 32.dp.toPx())
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.18f * strength),
-                            HermesTokens.Palette.primary.copy(alpha = 0.06f * strength),
-                            Color.Transparent
-                        ),
-                        center = center,
-                        radius = size.width * (0.22f + 0.25f * lightIn)
-                    ),
-                    center = center,
-                    radius = size.width * (0.22f + 0.25f * lightIn)
-                )
 
-                // “一束光”而不是一整片：宽而极淡的底光 + 窄而亮的芯，
-                // 斜着扫过全屏。峰值仍远低于全白，不会出现突然刷白。
-                val sweep = ramp(now, 0f, 1150f)
+                // 真正斜向的一束光：比鲸鱼更早出现，亮芯从左上穿到右下。
+                // 不放在光晕的 if 内，保证开场第一时间就有扫光。
+                val sweep = ramp(now, 0f, 1050f)
                 if (sweep > 0f && sweep < 1f) {
-                    val w = size.width
-                    val h = size.height
-                    val cx = -w * 0.18f + (w * 1.36f) * sweep
+                    val cx = -w * 0.30f + w * 1.60f * sweep
                     val pulse = kotlin.math.sin(sweep * kotlin.math.PI.toFloat())
                     listOf(
-                        w * 0.16f to 0.055f,
-                        w * 0.035f to 0.26f
+                        w * 0.10f to 0.16f,
+                        w * 0.025f to 0.70f
                     ).forEach { (band, peak) ->
                         drawRect(
                             brush = Brush.linearGradient(
@@ -123,11 +110,27 @@ fun HermesSplash(
                                     Color.White.copy(alpha = peak * pulse),
                                     Color.Transparent
                                 ),
-                                start = Offset(cx - band, -h * 0.12f),
-                                end = Offset(cx + band, h * 1.12f)
+                                start = Offset(cx - band, -h * 0.18f),
+                                end = Offset(cx + band, h * 1.18f)
                             )
                         )
                     }
+                }
+
+                // 只留很弱的聚焦底光，不拿它替代扫光。
+                if (strength > 0f) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.035f * strength),
+                                Color.Transparent
+                            ),
+                            center = center,
+                            radius = w * (0.20f + 0.18f * lightIn)
+                        ),
+                        center = center,
+                        radius = w * (0.20f + 0.18f * lightIn)
+                    )
                 }
 
                 // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。
@@ -165,7 +168,7 @@ fun HermesSplash(
                     } else {
                         0f
                     }
-                    alpha = 0.95f * (0.35f + 0.65f * rise)
+                    alpha = 0.95f * rise
                     translationX = (targetX - whaleCenterX).toPx() * fly
                     translationY = (targetY - whaleCenterY).toPx() * fly +
                         24.dp.toPx() * (1f - rise) * (1f - fly)

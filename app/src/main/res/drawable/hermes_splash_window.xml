@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 首帧之前由系统直接显示，避免应用初始化期间长时间纯黑。尺寸固定，不使用 512px 固有尺寸。 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/hermes_background" />
-    <item
-        android:width="148dp"
-        android:height="148dp"
-        android:gravity="center">
-        <bitmap
-            android:src="@drawable/whale_alpha"
-            android:gravity="fill" />
-    </item>
-</layer-list>
+<!-- 系统启动窗只负责铺底色。鲸鱼由 Compose 动画绘制，禁止“静态图 → 动画”的跳接。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/hermes_background" />
+</shape>

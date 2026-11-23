@@ -237,8 +237,10 @@ fun ClassicChatInputSection(
         setShowAttachmentPanel(false)
     }
 
+    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
     val surfaceColor = when {
         chatInputTransparent -> MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+        hermesSkin -> com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh
         hasBackgroundImage -> MaterialTheme.colorScheme.surface.copy(alpha = 0.85f)
         else -> MaterialTheme.colorScheme.surface
     }
@@ -255,9 +257,11 @@ fun ClassicChatInputSection(
         chatInputTransparent && chatInputLiquidGlass && !chatInputWaterGlass && isLiquidGlassSupported()
     val inputWaterGlassEnabled =
         chatInputTransparent && chatInputWaterGlass && isWaterGlassSupported()
-    val containerShape = if (chatInputFloating) RoundedCornerShape(22.dp) else RoundedCornerShape(0.dp)
+    val containerShape = if (hermesSkin) RoundedCornerShape(28.dp) else if (chatInputFloating) RoundedCornerShape(22.dp) else RoundedCornerShape(0.dp)
     val containerModifier =
-        if (chatInputFloating) {
+        if (hermesSkin) {
+            modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+        } else if (chatInputFloating) {
             modifier.padding(horizontal = 8.dp, vertical = 6.dp)
         } else {
             modifier

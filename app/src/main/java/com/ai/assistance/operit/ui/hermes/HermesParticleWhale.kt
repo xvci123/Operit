@@ -10,10 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -38,9 +43,25 @@ import kotlin.random.Random
  * 采样点使用图片自身的 0..1 坐标，在 Canvas 内映射到固定 124dp 方框，绝不乘屏幕宽高。
  */
 @Composable
-fun HermesParticleWhale(modifier: Modifier = Modifier, particleCount: Int = 320) {
+fun HermesParticleWhale(
+    modifier: Modifier = Modifier,
+    particleCount: Int = 320,
+    replayKey: String? = null
+) {
     val context = LocalContext.current
     val clock = remember { mutableFloatStateOf(0f) }
+    var resumeToken by remember { mutableIntStateOf(0) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 每次回到宠物/聊天页都重播一次星光汇聚，而不是只在本组合第一次进入时播放。
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) resumeToken++
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val targets = remember(particleCount) { sampleWhalePoints(context, particleCount) }
     val starts = remember(particleCount) {
         val rnd = Random(20261122)
@@ -55,14 +76,14 @@ fun HermesParticleWhale(modifier: Modifier = Modifier, particleCount: Int = 320)
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(replayKey, resumeToken) {
+        clock.floatValue = 0f
         val startNanos = withFrameNanos { it }
         while (true) {
             val elapsedMs = (withFrameNanos { it } - startNanos) / 1_000_000f
             clock.floatValue = elapsedMs
             if (elapsedMs >= FINISH_MS) break
         }
-        // 不保持无限 withFrameNanos 循环；动画完成后鲸鱼和文字都真正静止。
     }
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {

@@ -297,8 +297,8 @@ fun AppContent(
                                         // 最后的默认值
                                         else -> ""
                                     },
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 22.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 28.sp,
                                     color = appBarContentColor
                                 )
 
