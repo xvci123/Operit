@@ -3352,3 +3352,6 @@ private fun expandCornerRadius(base: CornerRadius, expansion: Float): CornerRadi
         x = (base.x + expansion).coerceAtLeast(0f),
         y = (base.y + expansion).coerceAtLeast(0f),
     )
+
+
+private val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK

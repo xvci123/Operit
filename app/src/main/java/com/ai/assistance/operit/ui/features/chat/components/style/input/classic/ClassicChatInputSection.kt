@@ -780,3 +780,6 @@ fun ClassicChatInputSection(
         }
     }
 }
+
+
+private val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
