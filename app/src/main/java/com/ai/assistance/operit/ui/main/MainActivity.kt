@@ -35,6 +35,7 @@ import androidx.lifecycle.lifecycleScope
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.api.chat.AIForegroundService
 import com.ai.assistance.operit.core.application.OperitApplication
+import com.ai.assistance.operit.core.hermes.HermesOnboardingStore
 import com.ai.assistance.operit.core.tools.AIToolHandler
 import com.ai.assistance.operit.data.preferences.AgreementPreferences
 import com.ai.assistance.operit.data.preferences.DisplayPreferencesManager
@@ -207,9 +208,14 @@ class MainActivity : ComponentActivity() {
         // Hermes：先把轻量启动页挂上去，再在后台初始化。这样首帧不再等
         // initializeMainApplication + 整个 OperitApp 组合完成，动画不会被启动耗时吃掉。
         agreementPreferences = AgreementPreferences(this)
-        hermesOnboardingFinished =
+        val alreadyConfigured =
                 agreementPreferences.isAgreementAccepted() &&
                         androidPermissionPreferences.getPreferredPermissionLevel() != null
+        if (alreadyConfigured) {
+            // 老用户没有新 marker 时补写一次，保证“引导只走一次”。
+            HermesOnboardingStore.markDone(this)
+        }
+        hermesOnboardingFinished = HermesOnboardingStore.isDone(this) || alreadyConfigured
         setAppContent()
 
         lifecycleScope.launch {
@@ -223,32 +229,37 @@ class MainActivity : ComponentActivity() {
                 AppLogger.e(TAG, "Hermes startup initialization failed", e)
             }
 
-            initializeComponents()
-            anrMonitor.start()
-            configureDisplaySettings()
+            try {
+                initializeComponents()
+                anrMonitor.start()
+                configureDisplaySettings()
 
-            // 设置上下文以便获取插件元数据
-            pluginLoadingState.setAppContext(this@MainActivity)
-            PluginLoadingStateRegistry.bind(pluginLoadingState, lifecycleScope)
+                // 设置上下文以便获取插件元数据
+                pluginLoadingState.setAppContext(this@MainActivity)
+                PluginLoadingStateRegistry.bind(pluginLoadingState, lifecycleScope)
 
-            // 设置跳过加载的回调
-            pluginLoadingState.setOnSkipCallback {
-                AppLogger.d(TAG, "用户跳过了插件加载过程")
-                Toast.makeText(
-                        this@MainActivity,
-                        getString(R.string.plugin_loading_skipped),
-                        Toast.LENGTH_SHORT
-                ).show()
+                // 设置跳过加载的回调
+                pluginLoadingState.setOnSkipCallback {
+                    AppLogger.d(TAG, "用户跳过了插件加载过程")
+                    Toast.makeText(
+                            this@MainActivity,
+                            getString(R.string.plugin_loading_skipped),
+                            Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+                // 在真正挂主界面前确定目的地，避免新用户先按“聊天页”播放飞行再跳配置。
+                checkPermissionLevelSet()
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Hermes UI initialization failed", e)
+            } finally {
+                // 非关键初始化不能把启动页永久挂住；主界面先出来，更新检查随后跑。
+                hermesBootReady = true
             }
 
-            // 在真正挂主界面前确定目的地，避免新用户先按“聊天页”播放飞行再跳配置。
-            checkPermissionLevelSet()
-
-            // 初始化并设置更新管理器
-            setupUpdateManager()
-
-            // 只在此后组合完整 App，启动页遮住这段组合耗时。
-            hermesBootReady = true
+            // 初始化并设置更新管理器（不再阻塞启动页）
+            runCatching { setupUpdateManager() }
+                .onFailure { AppLogger.e(TAG, "Hermes update manager init failed", it) }
 
             // 只在首次创建时执行检查（非配置变更）
             if (savedInstanceState == null) {
@@ -679,6 +690,7 @@ class MainActivity : ComponentActivity() {
                                     onComplete = {
                                         showPermissionGuide = false
                                         hermesOnboardingFinished = true
+                                        HermesOnboardingStore.markDone(this@MainActivity)
                                         // 权限设置完成后，启动插件加载并更新内容
                                         startPluginLoading()
                                         setAppContent()

@@ -351,7 +351,12 @@ fun AgentChatInputSection(
         },
     )
 
-    val inputTextStyle = TextStyle(fontSize = 14.sp, lineHeight = 20.sp)
+    val inputTextStyle = TextStyle(
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        color = if (com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK)
+            Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface
+    )
     val mentionVisualTransformation = rememberMentionVisualTransformation(inputTextStyle)
     val colorScheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
@@ -495,7 +500,7 @@ fun AgentChatInputSection(
     }
 
     val isDarkTheme = MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
-    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
+    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val darkModeInputColor =
         if (hermesSkin) {
             com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh
@@ -919,7 +924,7 @@ fun AgentChatInputSection(
                                     Text(
                                         text = modelLabel,
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                                        color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.widthIn(max = 160.dp),
@@ -933,7 +938,7 @@ fun AgentChatInputSection(
                                                 Icons.Default.KeyboardArrowDown
                                             },
                                         contentDescription = context.getString(R.string.select_model_config),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = if (hermesSkin) Color(0xFFA6ACB8) else MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(18.dp),
                                     )
                                 }
@@ -1219,7 +1224,7 @@ fun AgentChatInputSection(
                                         Text(
                                             text = modelLabel,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
+                                            color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.widthIn(max = 160.dp),

@@ -193,7 +193,9 @@ fun AppContent(
     val appBarContentColorMode = themeSnapshot.appBarContentColorMode
 
     val appBarContentColor =
-            if (forceAppBarContentColor) {
+            if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) {
+                MaterialTheme.colorScheme.onBackground
+            } else if (forceAppBarContentColor) {
                 when (appBarContentColorMode) {
                     UserPreferencesManager.APP_BAR_CONTENT_COLOR_MODE_LIGHT -> Color.White
                     UserPreferencesManager.APP_BAR_CONTENT_COLOR_MODE_DARK -> Color.Black
@@ -316,26 +318,31 @@ fun AppContent(
                         }
                     },
                     navigationIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // 三横线：抽屉入口。
-                            IconButton(
-                                onClick = {
-                                    if (canGoBack) {
-                                        onGoBack()
+                        IconButton(
+                            onClick = {
+                                if (canGoBack) {
+                                    onGoBack()
+                                } else {
+                                    if (useTabletLayout) {
+                                        onToggleSidebar()
                                     } else {
-                                        if (useTabletLayout) {
-                                            onToggleSidebar()
-                                        } else {
-                                            scope.launch { drawerState.open() }
-                                        }
+                                        scope.launch { drawerState.open() }
                                     }
                                 }
-                            ) {
+                            }
+                        ) {
+                            if (!canGoBack && !useTabletLayout) {
+                                // 鲸鱼就是菜单按钮：点击位置和抽屉逻辑与原三横线完全一致。
+                                Image(
+                                    painter = painterResource(id = R.drawable.whale_alpha),
+                                    contentDescription = stringResource(id = R.string.menu),
+                                    modifier = Modifier.size(26.dp),
+                                    colorFilter = ColorFilter.tint(appBarContentColor)
+                                )
+                            } else {
                                 Icon(
                                     if (canGoBack) Icons.Default.ArrowBack
-                                    else if (useTabletLayout)
-                                        if (isTabletSidebarExpanded) Icons.Filled.ChevronLeft
-                                        else Icons.Default.Menu
+                                    else if (isTabletSidebarExpanded) Icons.Filled.ChevronLeft
                                     else Icons.Default.Menu,
                                     contentDescription =
                                     when {
@@ -348,18 +355,6 @@ fun AppContent(
                                     tint = appBarContentColor
                                 )
                             }
-                            // 启动动画的落点：菜单右侧的小鲸鱼。它只是品牌标记，
-                            // 不承担导航，避免再次把抽屉入口替换掉。
-                            if (!canGoBack && !useTabletLayout) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.whale_alpha),
-                                    contentDescription = null,
-                                    modifier = Modifier
-                                        .padding(start = 2.dp, end = 6.dp)
-                                        .size(22.dp),
-                                    colorFilter = ColorFilter.tint(appBarContentColor)
-                                )
-                            }
                         }
                     },
                     actions = actions,
@@ -369,7 +364,8 @@ fun AppContent(
                         when {
                             toolbarTransparent -> Color.Transparent
                             useCustomAppBarColor && customAppBarColor != null -> Color(customAppBarColor)
-                            // Hermes：顶部栏默认用背景黑（原来是 primary 蓝，一条亮蓝横在顶上太抢眼）
+                            com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT ->
+                                MaterialTheme.colorScheme.background
                             else -> Color(com.ai.assistance.operit.core.hermes.HermesSkin.BG)
                         },
                         titleContentColor = appBarContentColor,

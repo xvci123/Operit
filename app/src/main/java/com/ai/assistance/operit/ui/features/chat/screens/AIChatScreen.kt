@@ -532,8 +532,10 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
     val bubbleCustomUserTextColor = bubbleUserTextColorValue?.let(::Color)
     val bubbleCustomAiTextColor = bubbleAiTextColorValue?.let(::Color)
 
+    val hermesChatDark = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val userMessageColor =
-        when (chatStyle) {
+        if (hermesChatDark) Color(0xFF2B2E34)
+        else when (chatStyle) {
             ChatStyle.CURSOR -> {
                 if (cursorUserBubbleFollowTheme) {
                     defaultUserMessageColor
@@ -545,12 +547,14 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
             ChatStyle.BUBBLE -> bubbleCustomUserMessageColor ?: defaultUserMessageColor
         }
     val aiMessageColor =
-        when (chatStyle) {
+        if (hermesChatDark) Color(0xFF17191D)
+        else when (chatStyle) {
             ChatStyle.BUBBLE -> bubbleCustomAiMessageColor ?: defaultAiMessageColor
             ChatStyle.CURSOR -> defaultAiMessageColor
         }
     val userTextColor =
-        when {
+        if (hermesChatDark) Color(0xFFF4F6F9)
+        else when {
             chatStyle == ChatStyle.CURSOR && cursorUserBubbleFollowTheme ->
                 MaterialTheme.colorScheme.onPrimaryContainer
             chatStyle == ChatStyle.BUBBLE && bubbleCustomUserTextColor != null ->
@@ -558,17 +562,23 @@ val actualViewModel: ChatViewModel = viewModel ?: viewModel { ChatViewModel(cont
             else -> getTextColorForBackground(userMessageColor.copy(alpha = 1f))
         }
     val aiTextColor =
-        when {
+        if (hermesChatDark) Color(0xFFF4F6F9)
+        else when {
             chatStyle == ChatStyle.BUBBLE && bubbleCustomAiTextColor != null ->
                 bubbleCustomAiTextColor
             chatStyle == ChatStyle.BUBBLE ->
                 getTextColorForBackground(aiMessageColor.copy(alpha = 1f))
             else -> MaterialTheme.colorScheme.onSurface
         }
-    val systemMessageColor = MaterialTheme.colorScheme.surfaceVariant
-    val systemTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val thinkingBackgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-    val thinkingTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val systemMessageColor =
+        if (hermesChatDark) Color(0xFF23262C) else MaterialTheme.colorScheme.surfaceVariant
+    val systemTextColor =
+        if (hermesChatDark) Color(0xFFD9DDE5) else MaterialTheme.colorScheme.onSurfaceVariant
+    val thinkingBackgroundColor =
+        if (hermesChatDark) Color(0xFF1E2127)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+    val thinkingTextColor =
+        if (hermesChatDark) Color(0xFFD9DDE5) else MaterialTheme.colorScheme.onSurfaceVariant
 
     val bubbleUserImageStyle =
         remember(

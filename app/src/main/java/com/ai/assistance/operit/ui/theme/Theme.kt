@@ -71,6 +71,30 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import io.github.fletchmckee.liquid.liquefiable
 import io.github.fletchmckee.liquid.rememberLiquidState
 
+private val HermesLightColorScheme =
+        lightColorScheme(
+                primary = HermesTokens.Light.primary,
+                onPrimary = Color.White,
+                primaryContainer = Color(0xFFDCE7FF),
+                onPrimaryContainer = Color(0xFF15346E),
+                secondary = Color(0xFF5F6F8F),
+                onSecondary = Color.White,
+                background = HermesTokens.Light.bg,
+                onBackground = HermesTokens.Light.text,
+                surface = HermesTokens.Light.surface,
+                onSurface = HermesTokens.Light.text,
+                surfaceVariant = HermesTokens.Light.surfaceHigh,
+                onSurfaceVariant = HermesTokens.Light.textSecondary,
+                surfaceContainerLowest = HermesTokens.Light.bg,
+                surfaceContainerLow = HermesTokens.Light.surface,
+                surfaceContainer = HermesTokens.Light.surface,
+                surfaceContainerHigh = HermesTokens.Light.surfaceHigh,
+                surfaceContainerHighest = HermesTokens.Light.surfaceHigh,
+                outline = HermesTokens.Light.outline,
+                outlineVariant = HermesTokens.Light.outline,
+                error = HermesTokens.Light.danger,
+        )
+
 private val DarkColorScheme =
         darkColorScheme(primary = Purple80, secondary = PurpleGrey80, tertiary = Pink80)
 
@@ -158,7 +182,10 @@ fun OperitTheme(content: @Composable () -> Unit) {
             } else {
                 themeMode == UserPreferencesManager.THEME_MODE_DARK
             }
-    val darkTheme = if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) true else userDarkTheme
+    val darkTheme =
+            if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) false
+            else if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) true
+            else userDarkTheme
 
     // Dynamic color is available on Android 12+
     val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -166,6 +193,8 @@ fun OperitTheme(content: @Composable () -> Unit) {
     // 基础主题色调
     var colorScheme =
             when {
+                com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT ->
+                        HermesLightColorScheme
                 dynamicColor -> {
                     if (darkTheme) dynamicDarkColorScheme(context)
                     else dynamicLightColorScheme(context)
@@ -174,8 +203,8 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 else -> LightColorScheme
             }
 
-    // 应用自定义颜色和文本颜色
-    if (useCustomColors) {
+    // 应用自定义颜色和文本颜色（浅色皮肤期间不让旧的深色自定义偏好覆盖）
+    if (useCustomColors && !com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT) {
         customPrimaryColor?.let { primaryArgb ->
             val primary = Color(primaryArgb)
             val secondary = customSecondaryColor?.let { Color(it) } ?: colorScheme.secondary
@@ -210,8 +239,12 @@ fun OperitTheme(content: @Composable () -> Unit) {
                 insetsController?.show(WindowInsetsCompat.Type.statusBars())
                 
                 // 状态栏颜色和图标颜色控制
-                val statusBarColor = if (com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK) {
-                    // Hermes 皮肤只有一条来源；旧版保存的自定义状态栏颜色不能覆盖皮肤。
+                val statusBarColor =
+                        if (
+                                com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT ||
+                                com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
+                        ) {
+                    // Hermes 浅色/深色皮肤只有一条来源；旧版自定义状态栏颜色不能覆盖。
                     colorScheme.background.toArgb()
                 } else when {
                     statusBarTransparent -> Color.Transparent.toArgb()

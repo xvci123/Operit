@@ -60,6 +60,19 @@ object HermesTokens {
         val pressOverlay = Color.White.copy(alpha = 0.06f)
     }
 
+    /** 浅色皮肤：页面/菜单/设置使用灰白分层，聊天区域单独保持深色。 */
+    object Light {
+        val bg = Color(0xFFF1F1EE)
+        val surface = Color(0xFFFAFAF8)
+        val surfaceHigh = Color(0xFFE6E6E1)
+        val outline = Color(0xFFD0D0C9)
+        val text = Color(0xFF1C1C1E)
+        val textSecondary = Color(0xFF62636A)
+        val textMuted = Color(0xFF8A8B91)
+        val primary = Color(0xFF2563EB)
+        val danger = Color(0xFFC73832)
+    }
+
     /** 圆角。主圆角 16dp（一代以 4/6/8dp 为主，整体抬一档）。 */
     object Radius {
         val xs: Dp = 8.dp

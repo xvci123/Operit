@@ -77,10 +77,10 @@ fun HermesSplash(
     ) {
         val whaleCenterX = maxWidth / 2
         val whaleCenterY = maxHeight / 2 - 32.dp
-        val targetX = 65.dp
+        val targetX = 28.dp
         val targetY = statusTop + 32.dp
         val startSize = 148.dp
-        val endSize = 22.dp
+        val endSize = 26.dp
 
         // 背景层。扫光必须独立于径向光的 strength：否则 strength=0 时整段光都被跳过。
         Box(
@@ -88,10 +88,8 @@ fun HermesSplash(
                 val now = clock.floatValue
                 val w = size.width
                 val h = size.height
-                val center = Offset(w / 2f, h / 2f - 32.dp.toPx())
 
-                // 真正的斜向扫束：从左上穿到右下，先于鲸鱼出现。
-                // 不加径向光晕，避免又变成“鲸鱼背后一圈光”。
+                // 只保留斜向光带，不带任何径向光圈。
                 val sweep = ramp(now, 0f, 1050f)
                 if (sweep > 0f && sweep < 1f) {
                     val cx = -w * 0.30f + w * 1.60f * sweep
@@ -112,22 +110,6 @@ fun HermesSplash(
                             )
                         )
                     }
-                }
-
-                // 四周向中心收暗；中心始终透明，不会出现矩形光边或全白帧。
-                val gather = easeOutCubic(ramp(now, 900f, 1550f))
-                if (gather > 0f) {
-                    drawRect(
-                        brush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                HermesTokens.Palette.bg.copy(alpha = 0.45f * gather),
-                                HermesTokens.Palette.bg.copy(alpha = gather)
-                            ),
-                            center = center,
-                            radius = maxOf(size.width, size.height) * (0.95f - 0.45f * gather)
-                        )
-                    )
                 }
             }
         )

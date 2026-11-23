@@ -48,6 +48,7 @@ fun ChatHeader(
         subagentCount: Int = 0
 ) {
         val displayCharacterName = activeCharacterName.toChatHeaderName()
+        val hermesLight = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_LIGHT
 
         Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -138,6 +139,8 @@ fun ChatHeader(
                                                         historyIconColor?.let { Color(it) }
                                                                 ?: if (showChatHistorySelector)
                                                                         MaterialTheme.colorScheme.primary
+                                                                else if (hermesLight)
+                                                                        MaterialTheme.colorScheme.onSurface
                                                                 else
                                                                         com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text
                                                                                 .copy(alpha = 0.92f),
@@ -172,8 +175,8 @@ fun ChatHeader(
                                                         ?: if (isFloatingMode)
                                                                 MaterialTheme.colorScheme.primary
                                                         else
-                                                                com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text
-                                                                        .copy(alpha = 0.92f),
+                                                                if (hermesLight) MaterialTheme.colorScheme.onSurface
+                                                                else com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text.copy(alpha = 0.92f),
                                         modifier = Modifier.size(20.dp)
                                 )
                         }
@@ -219,7 +222,8 @@ fun ChatHeader(
                                 text = displayCharacterName,
                                 style = MaterialTheme.typography.bodyMedium,
                                 // 显式给文字色：不写会落到 LocalContentColor，深底上偏暗
-                                color = com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text,
+                                color = if (hermesLight) MaterialTheme.colorScheme.onSurface
+                                else com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.text,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.widthIn(max = 116.dp)

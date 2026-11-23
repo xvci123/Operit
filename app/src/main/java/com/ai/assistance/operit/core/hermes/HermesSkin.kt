@@ -26,7 +26,10 @@ object HermesSkin {
      * 一旦被切成浅色，Material 会给浅底+深字，和我们的 token 直接冲突。
      * 将来做浅色皮肤时把这里改 false，并补一套 light token。
      */
-    const val FORCE_DARK = true
+    const val FORCE_DARK = false
+    const val FORCE_LIGHT = true
+    /** 聊天区域仍使用深色；页面/菜单/设置走浅灰。 */
+    const val CHAT_DARK = true
 
     // DSHA 式深灰分层：底 #15171B、卡片 #1E2127、次级卡 #282C34、描边 #3A3F4A
     const val BG = 0xFF15171B.toInt()

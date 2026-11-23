@@ -416,7 +416,11 @@ fun ChatArea(
     Box(
         modifier =
             modifier
-                .background(Color.Transparent)
+                .background(
+                    if (com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK)
+                        Color(0xFF0F1012)
+                    else Color.Transparent
+                )
                 .onGloballyPositioned { coordinates ->
                     viewportHeightPx = coordinates.size.height
                 },

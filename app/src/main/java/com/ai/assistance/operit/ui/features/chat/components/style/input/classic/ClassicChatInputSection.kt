@@ -237,7 +237,7 @@ fun ClassicChatInputSection(
         setShowAttachmentPanel(false)
     }
 
-    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.FORCE_DARK
+    val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val surfaceColor = when {
         chatInputTransparent -> MaterialTheme.colorScheme.surface.copy(alpha = 0f)
         hermesSkin -> com.ai.assistance.operit.ui.hermes.HermesTokens.Palette.surfaceHigh
@@ -522,7 +522,7 @@ fun ClassicChatInputSection(
                                 false
                             }
                         },
-                    textStyle = modernTextStyle.copy(color = MaterialTheme.colorScheme.onSurface),
+                    textStyle = modernTextStyle.copy(color = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     visualTransformation = mentionVisualTransformation,
                     maxLines = 5,
