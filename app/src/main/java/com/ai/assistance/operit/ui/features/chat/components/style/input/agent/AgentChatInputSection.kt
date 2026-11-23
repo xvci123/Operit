@@ -499,7 +499,9 @@ fun AgentChatInputSection(
         }
     }
 
-    val isDarkTheme = if (hermesSkin) Color(0xFFF4F6F9) else MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
+    val isDarkTheme =
+        com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK ||
+            MaterialTheme.colorScheme.onSurface.luminance() > 0.5f
     val hermesSkin = com.ai.assistance.operit.core.hermes.HermesSkin.CHAT_DARK
     val darkModeInputColor =
         if (hermesSkin) {
