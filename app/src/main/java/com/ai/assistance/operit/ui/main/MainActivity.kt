@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import com.ai.assistance.operit.util.AppLogger
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -74,6 +75,15 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_SETTINGS_SHORTCUT = "com.ai.assistance.operit.action.OPEN_SETTINGS_SHORTCUT"
         const val EXTRA_OPEN_CHAT_ID = "open_chat_id"
+
+        /**
+         * 启动动画的时间原点（[SystemClock.elapsedRealtime]，进程级）。
+         *
+         * 必须是进程级、而且必须是墙钟：`setContent` 在协议/权限回调里会被再次调用，
+         * 整棵组合树重建、启动层的 `LaunchedEffect` 重开。之前动画时钟在 effect 里累加，
+         * 一重建就从 0 重播 —— 真机上的表现就是"鲸鱼不往左上角飞了"。
+         */
+        private var hermesSplashStartMs = 0L
     }
 
     private val TAG = "MainActivity"
@@ -222,6 +232,10 @@ class MainActivity : ComponentActivity() {
             HermesOnboardingStore.markDone(this)
         }
         hermesOnboardingFinished = HermesOnboardingStore.isDone(this) || alreadyConfigured
+        // Activity 重建（recreate/配置变更）不重播启动动画：进程级原点只认第一次。
+        if (hermesSplashStartMs == 0L) {
+            hermesSplashStartMs = SystemClock.elapsedRealtime()
+        }
         setAppContent()
 
         lifecycleScope.launch {
@@ -660,10 +674,9 @@ class MainActivity : ComponentActivity() {
 
     // ======== 设置应用内容 ========
     private fun setAppContent() {
-        // 重新 setContent 会重建整棵树：启动层若已经落地，就不要让动画再播一遍。
-        if (hermesSplashLanded) {
-            hermesSplashDone = true
-        }
+        // 重新 setContent 会重建整棵树，但启动层的时钟是墙钟 + 进程级原点，
+        // 重建只会"接着播"，不会重播，所以这里不再需要"落地即完成"的闸门
+        // （那个闸门会把落地后停在图标上的 0.5 秒砍掉，看起来就是没飞到）。
         setContent {
             Box(modifier = Modifier.fillMaxSize()) {
             if (hermesSplashLanded || hermesSplashDone) {
@@ -785,6 +798,7 @@ class MainActivity : ComponentActivity() {
                         flyToHeader = hermesOnboardingFinished,
                         hold = !hermesBootReady,
                         appReady = hermesAppDrawn,
+                        startedAtMs = hermesSplashStartMs,
                         onLanded = { hermesSplashLanded = true },
                         onFinished = { hermesSplashDone = true }
                 )
