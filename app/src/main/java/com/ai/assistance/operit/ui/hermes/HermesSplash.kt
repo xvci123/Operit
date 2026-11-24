@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.ui.hermes
 
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -118,8 +119,11 @@ fun HermesSplash(
         }
 
         // 2. 鲸鱼：起于屏幕中心偏上，终于左上角菜单按钮（48dp IconButton 的中心 = 28dp）。
-        val fly =
-            if (flyToHeader) hermesEaseInOut(hermesRamp(now, FLY_START_MS, FLY_END_MS)) else 0f
+        // 飞行无条件执行：飞向一个"可能还不存在"的图标，也比完全不飞好。
+        val fly = hermesEaseInOut(hermesRamp(now, FLY_START_MS, FLY_END_MS))
+        if (now >= FLY_START_MS) {
+            Log.d("HermesSplash", "fly=$fly t=$now landedAt=($endCx,$endCy) flyToHeader=$flyToHeader")
+        }
         val startSize = 150.dp.toPx()
         val endSize = 26.dp.toPx()
         val whaleSize = startSize + (endSize - startSize) * fly
