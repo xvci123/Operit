@@ -52,6 +52,24 @@ class ConversationMarkupManager {
          * @return The formatted tool result message
          */
         fun formatToolResultForMessage(result: ToolResult): String {
+            val toolResultXml = formatToolResultBody(result)
+            return withAdditionalContexts(toolResultXml, result.additionalContexts)
+        }
+
+        /**
+         * 补充上下文和正文分开拼：正文有字数上限（会被截断），
+         * 而"环境变成了什么样"这类提示被截掉就等于没给。
+         */
+        private fun withAdditionalContexts(xml: String, contexts: List<String>): String {
+            val extra =
+                contexts
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .joinToString("\n") { "<context>$it</context>" }
+            return if (extra.isEmpty()) xml else "$xml\n$extra"
+        }
+
+        private fun formatToolResultBody(result: ToolResult): String {
             return if (result.success) {
                 val (toolPayload, imageLinkPayload) = splitImageLinksForModel(result.result.toString())
                 val toolResultXml =
@@ -66,6 +84,16 @@ class ConversationMarkupManager {
                 appendImageLinksWithinResultLimit(toolResultXml, imageLinkPayload)
             } else {
                 val errorPayload = buildString {
+                    val info = result.errorInfo
+                    if (info != null) {
+                        append("[")
+                        append(info.code)
+                        append("]")
+                        if (info.retriable) {
+                            append(" (retriable)")
+                        }
+                        append("\n")
+                    }
                     val message = result.error.orEmpty().trim()
                     val detail = result.result.toString().trim()
                     append(message)
