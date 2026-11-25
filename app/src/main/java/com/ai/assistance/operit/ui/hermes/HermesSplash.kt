@@ -13,7 +13,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -30,7 +29,6 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +38,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -86,13 +85,10 @@ fun HermesSplash(
     flyToHeader: Boolean,
     hold: Boolean = false,
     appReady: Boolean = true,
-    /** 启动层的时间原点（`SystemClock.elapsedRealtime()`）。0 = 现在就起算。 */
-    startedAtMs: Long = 0L,
     onLanded: () -> Unit = {},
     onFinished: () -> Unit
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
     val clock = remember { mutableFloatStateOf(0f) }
     val whale =
         remember {
@@ -106,71 +102,58 @@ fun HermesSplash(
     val landedCallback = rememberUpdatedState(onLanded)
     val finishedCallback = rememberUpdatedState(onFinished)
 
-    // 时间原点只认一次：重建组合不会把它重置回 0。
-    val anchor = remember { if (startedAtMs > 0L) startedAtMs else SystemClock.elapsedRealtime() }
-
     LaunchedEffect(Unit) {
-        // 启动层"应开始播放"的时刻。hold 与"等 App 出第一帧"都靠把它往后推来实现冻结，
-        // 这样墙钟一直在走，但虚拟时间停住 —— 不需要维护偏移量，也不会累加漂移。
-        var baseStart = anchor
+        // 只用 delay 驱动，不用 withFrameNanos：delay 一定会恢复，
+        // 不依赖"有没有下一帧"。帧时钟一旦卡住，这里的 withFrameNanos 就永远不返回，
+        // 表现是黑屏且日志一行都没有。
+        var virtual = hermesSplashConsumedMs.coerceIn(0f, TOTAL_MS)
         var lastWall = SystemClock.elapsedRealtime()
         var landed = false
-        var waitedForApp = 0L
+        var waitedForApp = 0f
         var lastPhase = -1
-        // 只报一次落点，真机 logcat 直接能看出"飞没飞、落到哪"。
-        val endCxPx = with(density) { 28.dp.toPx() }
-        val endCyPx = with(density) { statusTop.toPx() + 32.dp.toPx() }
+        Log.i("HermesSplash", "start resumeAt=${virtual.toInt()}ms hold=${holdState.value}")
 
         while (true) {
-            withFrameNanos { } // 只用来对齐刷新；时间本身不来自这里
+            delay(16)
             val wall = SystemClock.elapsedRealtime()
-            val dt = (wall - lastWall).coerceIn(0L, 64L)
+            val dt = (wall - lastWall).coerceIn(0L, 64L).toFloat()
             lastWall = wall
 
-            // 冻结靠把起点往后推：墙钟照走，虚拟时间停住，不维护偏移量也不会漂移。
-            var now = (wall - baseStart) / 1_000_000f
-            var frozen = false
-            // 启动没就绪：停在"光已扫完、鲸鱼完整、还没起飞"，而不是停在黑屏。
-            if (holdState.value && now >= HOLD_AT_MS) {
-                baseStart += dt
-                frozen = true
-            }
-            // 已落地但 App 还没出第一帧：停在图标位置上等，最多等 1.2s。
-            if (!frozen &&
-                now >= FLY_END_MS &&
-                !readyState.value &&
-                waitedForApp < APP_WAIT_CAP_MS
-            ) {
+            var next = virtual + dt
+            // hold：冻结在"光已扫完、字已淡出、鲸鱼完整但还没起飞"
+            if (holdState.value) next = minOf(next, HOLD_AT_MS)
+            // 已落地但 App 还没出第一帧：停在图标位置等，最多 1.2s
+            if (next >= FLY_END_MS && !readyState.value && waitedForApp < APP_WAIT_CAP_MS) {
                 waitedForApp += dt
-                baseStart += dt
-                frozen = true
+                next = minOf(next, FLY_END_MS)
             }
-            if (frozen) now = (wall - baseStart) / 1_000_000f
+            virtual = next
+            hermesSplashConsumedMs = virtual
+            clock.floatValue = virtual
 
             val phase =
                 when {
-                    now < BEAM_START_MS -> 0
-                    now < BEAM_END_MS -> 1
-                    now < FLY_START_MS -> 2
-                    now < FLY_END_MS -> 3
+                    virtual < BEAM_START_MS -> 0
+                    virtual < BEAM_END_MS -> 1
+                    virtual < FLY_START_MS -> 2
+                    virtual < FLY_END_MS -> 3
                     else -> 4
                 }
             if (phase != lastPhase) {
                 lastPhase = phase
                 Log.i(
                     "HermesSplash",
-                    "phase=$phase t=${now.toInt()}ms flyToHeader=$flyToHeader " +
-                        "landedAt=(${endCxPx.toInt()},${endCyPx.toInt()})px hold=${holdState.value}"
+                    "phase=$phase t=${virtual.toInt()}ms flyToHeader=$flyToHeader hold=${holdState.value}"
                 )
             }
 
-            clock.floatValue = now
-            if (!landed && now >= FLY_END_MS) {
+            if (!landed && virtual >= FLY_END_MS) {
                 landed = true
                 landedCallback.value()
             }
-            if (now >= TOTAL_MS) break
+            if (virtual >= TOTAL_MS) break
         }
+        Log.i("HermesSplash", "finished at ${hermesSplashConsumedMs.toInt()}ms")
         finishedCallback.value()
     }
 
@@ -435,6 +418,16 @@ private fun hermesBeamCurve(x: Float): Float {
     }
     return fy(t)
 }
+
+/**
+ * 进程内"已经播掉的毫秒数"。
+ *
+ * 这是启动动画唯一的状态。**不能**把起点锚在 `onCreate`：从 `onCreate` 到真正画出
+ * 第一帧之间隔着重初始化（插件、数据库、MCP…），实测能到 3 秒以上 ——
+ * 锚在 `onCreate` 的话，动画一启动就已经"播完了"，屏幕只剩底色，看起来就是黑屏。
+ * 所以起点是第一帧，靠这个变量保证"重新 setContent 只接着播、不重播"。
+ */
+private var hermesSplashConsumedMs = 0f
 
 /** 光带方向：屏幕坐标下 45° 指向右下。 */
 private const val BEAM_UX = 0.70710678f

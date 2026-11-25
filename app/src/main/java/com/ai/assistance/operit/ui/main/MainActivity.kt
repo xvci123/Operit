@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import com.ai.assistance.operit.util.AppLogger
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -21,6 +20,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -75,15 +75,6 @@ class MainActivity : ComponentActivity() {
     companion object {
         const val ACTION_OPEN_SETTINGS_SHORTCUT = "com.ai.assistance.operit.action.OPEN_SETTINGS_SHORTCUT"
         const val EXTRA_OPEN_CHAT_ID = "open_chat_id"
-
-        /**
-         * 启动动画的时间原点（[SystemClock.elapsedRealtime]，进程级）。
-         *
-         * 必须是进程级、而且必须是墙钟：`setContent` 在协议/权限回调里会被再次调用，
-         * 整棵组合树重建、启动层的 `LaunchedEffect` 重开。之前动画时钟在 effect 里累加，
-         * 一重建就从 0 重播 —— 真机上的表现就是"鲸鱼不往左上角飞了"。
-         */
-        private var hermesSplashStartMs = 0L
     }
 
     private val TAG = "MainActivity"
@@ -232,10 +223,6 @@ class MainActivity : ComponentActivity() {
             HermesOnboardingStore.markDone(this)
         }
         hermesOnboardingFinished = HermesOnboardingStore.isDone(this) || alreadyConfigured
-        // Activity 重建（recreate/配置变更）不重播启动动画：进程级原点只认第一次。
-        if (hermesSplashStartMs == 0L) {
-            hermesSplashStartMs = SystemClock.elapsedRealtime()
-        }
         setAppContent()
 
         lifecycleScope.launch {
@@ -679,6 +666,14 @@ class MainActivity : ComponentActivity() {
         // （那个闸门会把落地后停在图标上的 0.5 秒砍掉，看起来就是没飞到）。
         setContent {
             Box(modifier = Modifier.fillMaxSize()) {
+            // 兜底：启动层再怎么出问题，也必须在几秒内把主界面放出来，绝不允许黑屏到底。
+            // 正常时序（3.4s 完成）下这两条都不会触发。
+            LaunchedEffect(Unit) {
+                delay(6000)
+                if (!hermesSplashLanded) hermesSplashLanded = true
+                delay(3000)
+                if (!hermesSplashDone) hermesSplashDone = true
+            }
             if (hermesSplashLanded || hermesSplashDone) {
             OperitTheme {
                 Box(modifier = Modifier.onPlaced { hermesAppDrawn = true }) {
@@ -798,7 +793,6 @@ class MainActivity : ComponentActivity() {
                         flyToHeader = hermesOnboardingFinished,
                         hold = !hermesBootReady,
                         appReady = hermesAppDrawn,
-                        startedAtMs = hermesSplashStartMs,
                         onLanded = { hermesSplashLanded = true },
                         onFinished = { hermesSplashDone = true }
                 )
