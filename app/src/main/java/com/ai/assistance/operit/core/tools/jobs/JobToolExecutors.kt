@@ -113,6 +113,9 @@ class JobOutputToolExecutor(private val context: Context) : ToolExecutor {
                         ?: JobManager.DEFAULT_MAX_CHARS
         val fromHead =
                 tool.parameters.find { it.name == "mode" }?.value?.trim()?.lowercase() == "head"
+        // 增量读：传了 since_offset 就只取该偏移之后的一段（上一次回复末尾会告诉你该传多少）
+        val sinceOffset =
+                tool.parameters.find { it.name == "since_offset" }?.value?.trim()?.toIntOrNull()
 
         val text =
                 runBlocking(Dispatchers.IO) {
@@ -121,7 +124,8 @@ class JobOutputToolExecutor(private val context: Context) : ToolExecutor {
                             id = jobId,
                             waitMs = if (waitRequested) timeoutMs else 0L,
                             maxChars = maxChars,
-                            fromHead = fromHead
+                            fromHead = fromHead,
+                            sinceOffset = sinceOffset
                     )
                 }
         return ToolResult(toolName = tool.name, success = true, result = StringResultData(text))

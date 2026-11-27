@@ -499,7 +499,8 @@ object JobManager {
             id: String,
             waitMs: Long,
             maxChars: Int,
-            fromHead: Boolean
+            fromHead: Boolean,
+            sinceOffset: Int? = null
     ): String {
         ensureLoaded(context)
         val record = synchronized(lock) { records[id] }
@@ -531,6 +532,37 @@ object JobManager {
 
         val body = currentBody(context, record)
         val total = body.length
+
+        // D-11：可选增量读。传了 since_offset 就只回这一段，并告诉它下次传多少——
+        // 省 token，也不会像"只给尾部"那样漏掉中间。不传仍然是全量快照（现状不变）。
+        if (sinceOffset != null) {
+            val from = sinceOffset.coerceIn(0, total)
+            val to = (from + limit).coerceAtMost(total)
+            val chunk = if (total == 0 || to <= from) "" else body.substring(from, to)
+            val remain = total - to
+            val incrementalHeader =
+                    buildString {
+                        append("作业 ").append(record.id).append('
+')
+                        append("状态：").append(statusLabel(record)).append('
+')
+                        if (total == 0) {
+                            append("输出：（暂无输出）\n")
+                        } else {
+                            append("输出（第 ").append(from).append(" 到 ").append(to)
+                            append(" 字符，共 ").append(total).append(" 字符）：\n")
+                        }
+                        append("----\n")
+                    }
+            val nextHint =
+                    when {
+                        total == 0 -> "\n----\n（还没有输出；作业结束后再来取）"
+                        remain > 0 ->
+                                "\n----\n（后面还有 " + remain + " 字符；下次传 since_offset=" + to + " 接着取）"
+                        else -> "\n----\n（已读到本次输出末尾；下次传 since_offset=" + total + " 只取新增）"
+                    }
+            return incrementalHeader + chunk + nextHint
+        }
         val truncated =
                 if (total <= limit) body
                 else if (fromHead) body.substring(0, limit)

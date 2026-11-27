@@ -670,13 +670,14 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "job_output",
-                            description = "Read the output of a background job. Without wait=true it returns what is available right now. With wait=true it waits until the job finishes or timeout_ms elapses. Omit job_id to list all jobs. Output is bounded: the head and tail are kept, the middle is replaced by a marker.",
+                            description = "Read the output of a background job. Without wait=true it returns what is available right now. With wait=true it waits until the job finishes or timeout_ms elapses. Omit job_id to list all jobs. Output is bounded: the head and tail are kept, the middle is replaced by a marker. Pass since_offset to fetch only what was appended since your last read (the previous reply tells you which value to use next) — cheaper than re-reading the whole tail.",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "job_id", type = "string", description = "optional, omit to list all jobs", required = false),
                                 ToolParameterSchema(name = "wait", type = "string", description = "optional, \"true\" to block until the job finishes", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "optional, max wait in ms when wait=true, default 30000", required = false),
                                 ToolParameterSchema(name = "max_chars", type = "number", description = "optional, max characters returned, default 16000", required = false),
-                                ToolParameterSchema(name = "mode", type = "string", description = "optional, head | tail (default tail: keep the newest output)", required = false)
+                                ToolParameterSchema(name = "mode", type = "string", description = "optional, head | tail (default tail: keep the newest output)", required = false),
+                                ToolParameterSchema(name = "since_offset", type = "number", description = "optional, return only the output appended after this character offset; the previous reply tells you the next value. Omit for a full snapshot", required = false)
                             )
                         ),
                         ToolPrompt(
@@ -3726,13 +3727,14 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "job_output",
-                            description = "读取后台作业的输出。不带 wait=true 时立刻返回当前已有的输出；带 wait=true 时会等到作业结束或 timeout_ms 用完。不传 job_id 则列出全部作业。输出有界：保留开头和结尾，中间用标记省略。",
+                            description = "读取后台作业的输出。不带 wait=true 时立刻返回当前已有的输出；带 wait=true 时会等到作业结束或 timeout_ms 用完。不传 job_id 则列出全部作业。输出有界：保留开头和结尾，中间用标记省略。传 since_offset 只取上次读取之后新增的部分（上一次回复末尾会告诉你下次该传多少），比每次重读整段省得多。",
                             parametersStructured = listOf(
                                 ToolParameterSchema(name = "job_id", type = "string", description = "可选，不传则列出全部作业", required = false),
                                 ToolParameterSchema(name = "wait", type = "string", description = "可选，\"true\" 表示等到作业结束", required = false),
                                 ToolParameterSchema(name = "timeout_ms", type = "number", description = "可选，wait=true 时最长等待毫秒数，默认 30000", required = false),
                                 ToolParameterSchema(name = "max_chars", type = "number", description = "可选，最多返回的字符数，默认 16000", required = false),
-                                ToolParameterSchema(name = "mode", type = "string", description = "可选，head | tail，默认 tail（保留最新输出）", required = false)
+                                ToolParameterSchema(name = "mode", type = "string", description = "可选，head | tail，默认 tail（保留最新输出）", required = false),
+                                ToolParameterSchema(name = "since_offset", type = "number", description = "可选，只返回该字符偏移之后新增的输出；下一次该传多少，上一次回复末尾会告诉你。不传则返回全量快照", required = false)
                             )
                         ),
                         ToolPrompt(
