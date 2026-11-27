@@ -1,0 +1,19 @@
+name: Node Probe
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check prebuilt Node for Android is reachable from CI
+        run: |
+          set -x
+          for v in v18.20.4 v16.20.2 v22.9.0; do
+            U="https://github.com/JaneaSystems/nodejs-mobile/releases/download/nodejs-mobile-${v}/nodejs-mobile-${v}-android.zip"
+            CODE=$(curl -sIL -o /dev/null -w "%{http_code}" "$U")
+            LEN=$(curl -sIL "$U" | tr -d '\r' | awk 'tolower($1)=="content-length:"{v=$2} END{print v}')
+            echo "RELEASE $v http=$CODE bytes=$LEN"
+          done
+          echo "--- npm registry ---"
+          curl -s https://registry.npmjs.org/nodejs-mobile-cordova | head -c 300
+          echo
+          curl -s "https://registry.npmjs.org/nodejs-mobile-react-native/latest" | head -c 300
