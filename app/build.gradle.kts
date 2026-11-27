@@ -874,70 +874,57 @@ tasks.configureEach {
 }
 
 
-// ===== Hermes: 取回 Node 引擎与胶水源码，摆成它 CMake 期望的结构 =====
-// 实测（构建日志里的真实文件树）：包里只有 src/android/jni/native-lib.cpp 这一个 cpp，
-// 它自己 CMakeLists 里引用的 cordova-bridge.cpp 并不存在——所以下面把那一行删掉。
+// ===== Hermes: 取 Node 引擎与桥源码（用 nodejs-mobile-react-native 包，源码是完整的）=====
+// 实测：cordova 包缺 cordova-bridge.{h,cpp}（.npmignore 排除），react-native 包齐全且 .so 已解压。
 val hermesNodeWork = layout.buildDirectory.dir("hermes-node")
 
 val hermesFetchLibnode by tasks.registering {
-    description = "下载 nodejs-mobile-cordova，摆出 native-lib.cpp 与 libnode（arm64）"
+    description = "下载 nodejs-mobile-react-native，摆出 cpp 源码 + libnode（arm64）"
     doLast {
         val work = hermesNodeWork.get().asFile
         work.mkdirs()
-        val tgz = File(work, "nodejs-mobile-cordova.tgz")
+        val tgz = File(work, "node-mobile-rn.tgz")
         if (!tgz.exists() || tgz.length() < 1_000_000L) {
-            val url = "https://registry.npmjs.org/nodejs-mobile-cordova/-/nodejs-mobile-cordova-0.4.3.tgz"
-            println("### HERMES: downloading $url")
-            URI(url).toURL().openStream().use { i -> tgz.outputStream().use { o -> i.copyTo(o) } }
+            val url = "https://registry.npmjs.org/nodejs-mobile-react-native/latest"
+            val tar = URI(url).toURL().openStream().use { i ->
+                i.bufferedReader().readText().let { t ->
+                    Regex(""""tarball":"([^"]+)"""").find(t)?.groupValues?.get(1)
+                }
+            } ?: error("### HERMES: cannot resolve tarball url")
+            println("### HERMES: downloading $tar")
+            URI(tar).toURL().openStream().use { i -> tgz.outputStream().use { o -> i.copyTo(o) } }
         }
-        val unpacked = File(work, "unpacked")
+        val unpacked = File(work, "unpacked-rn")
         unpacked.deleteRecursively()
         unpacked.mkdirs()
         project.exec { commandLine("tar", "-xzf", tgz.absolutePath, "-C", unpacked.absolutePath) }
-        val pkg = File(unpacked, "package")
+        val pkg = File(unpacked, "package/android")
 
         val cppDst = File(projectDir, "src/main/cpp/hermes")
+        cppDst.deleteRecursively()
         cppDst.mkdirs()
-        val nativeCpp = File(pkg, "src/android/jni/native-lib.cpp")
-        if (!nativeCpp.exists()) error("### HERMES: native-lib.cpp not found: ${nativeCpp.absolutePath}")
-        nativeCpp.copyTo(File(cppDst, "native-lib.cpp"), overwrite = true)
-
-        // npm 包里的 .npmignore 排除了桥的源码，从原仓库补（构建机能访问 GitHub）
-        val bridgeBase = "https://raw.githubusercontent.com/JaneaSystems/nodejs-mobile-cordova/master/src/android/jni"
-        listOf("cordova-bridge.cpp", "cordova-bridge.h").forEach { name ->
-            val dst = File(cppDst, name)
-            if (!dst.exists() || dst.length() < 200L) {
-                val url = "$bridgeBase/$name"
-                println("### HERMES: fetching $url")
-                try {
-                    URI(url).toURL().openStream().use { i -> dst.outputStream().use { o -> i.copyTo(o) } }
-                } catch (e: Exception) {
-                    println("### HERMES: WARN cannot fetch $name : ${e.message}")
-                }
-            }
+        File(pkg, "src/main/cpp").listFiles()?.filter { it.isFile }?.forEach {
+            it.copyTo(File(cppDst, it.name), overwrite = true)
+        }
+        if (!File(cppDst, "native-lib.cpp").exists() || !File(cppDst, "rn-bridge.h").exists()) {
+            error("### HERMES: bridge sources missing in react-native package")
         }
 
-        val libSrc = File(pkg, "libs/android/libnode")
+        val libSrc = File(pkg, "libnode")
         val libDst = File(cppDst, "libnode")
-        libSrc.copyRecursively(libDst, overwrite = true)
-        val gz = File(libDst, "bin/arm64-v8a/libnode.so.gz")
-        if (!gz.exists()) error("### HERMES: libnode.so.gz not found: ${gz.absolutePath}")
-        val outSo = File(libDst, "bin/arm64-v8a/libnode.so")
-        GZIPInputStream(gz.inputStream()).use { i -> outSo.outputStream().use { o -> i.copyTo(o) } }
-        gz.delete()
-        listOf("armeabi-v7a", "x86", "x86_64").forEach { abi ->
-            File(libDst, "bin/$abi").deleteRecursively()
-        }
+        File(libSrc, "include").copyRecursively(File(libDst, "include"), overwrite = true)
+        val soSrc = File(libSrc, "bin/arm64-v8a/libnode.so")
+        if (!soSrc.exists()) error("### HERMES: libnode.so missing")
+        val soDst = File(libDst, "bin/arm64-v8a/libnode.so")
+        soDst.parentFile.mkdirs()
+        soSrc.copyTo(soDst, overwrite = true)
 
-        var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
+        var cmake = File(pkg, "CMakeLists.txt").readText()
             .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
-        if (!File(cppDst, "cordova-bridge.cpp").exists()) {
-            theirCmake = theirCmake.replace(Regex("""(?m)^\s*cordova-bridge\.cpp\s*$\n?"""), "")
-        }
-        File(cppDst, "CMakeLists.txt").writeText(theirCmake)
+        File(cppDst, "CMakeLists.txt").writeText(cmake)
 
-        println("### HERMES: node sources ready; libnode.so ${outSo.length() / 1048576} MB; "
-                + "sources=native-lib.cpp only (cordova-bridge.cpp absent in package)")
+        println("### HERMES: node bridge ready; libnode.so ${soDst.length() / 1048576} MB")
+        println("### HERMES: cpp = " + cppDst.listFiles()!!.filter { it.extension == "cpp" }.joinToString(",") { it.name })
     }
 }
 
