@@ -153,7 +153,7 @@ object WakeRouter {
     }
 
     /**
-     * 某条唤醒已经被塞进当前轮的下一步并被模型读到（由 [HermesSteer.drainBlock] 回调）。
+     * 某条唤醒已经被塞进当前轮的下一步并被模型读到（由 [HermesSteer.drainTurns] 回调）。
      * 状态推到 DISPATCHED，等这一轮结束由 [finishSettledTurns] 收账。
      */
     fun markInjected(context: Context, sourceId: String) {

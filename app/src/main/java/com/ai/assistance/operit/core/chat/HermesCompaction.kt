@@ -4,147 +4,219 @@ import android.content.Context
 import com.ai.assistance.operit.util.AppLogger
 import org.json.JSONObject
 import java.io.File
+import java.util.UUID
 
 /**
- * 压缩守卫 + 压缩流水账（阶段 6）。
+ * 压缩（上下文折叠）的 DSHA 版实现（D-12）。
  *
- * 解决 Operit 原生总结的三个真问题：
+ * 对照 DSHA 的 `dsh-compaction-basic`，这里是它的安卓等价物：
  *
- * 1. **区间重叠**：消息条数触发和 token 比例触发互相不知道对方干过活。
- *    刚压完，条数仍然超阈值（因为"自上次总结后"的计数口径和插入位置不一致），
- *    于是立刻压第二次，把刚保留的最近几轮又吃进去。这里记住"上次压完时历史有多少条"，
- *    新增消息不够就不许再压（除非 token 已经明显超过阈值，那是真紧急）。
- * 2. **越压越长**：原生 prompt 明写"不要限制字数"，模型会把上一版摘要原样扩写，
- *    压完反而更大。这里在压缩前后各量一次字数，压完不更小就拒收（见 summarizeHistory）。
- * 3. **压了什么没人知道**：每次压缩写一行流水账（`filesDir/hermes/compaction.jsonl`），
- *    记录折叠了哪一段、多少字、压成多少字。出问题能倒回去看，也是将来"压缩事件化"的底子。
+ *  - **三笔账**：`compaction/start`、`compaction/summary`、`compaction/end` 写进会话事件日志
+ *    （`filesDir/hermes/events/<chatId>.jsonl`），带 `seq` 与 `compactionId`，纯日志可重放。
+ *  - **锁就是日志本身**：扫日志找"最近一次没有配对 end 的 start"，存在就是 busy，直接跳过。
+ *    不再用"新增够几条消息"这种土办法（那只能挡重复触发，挡不住并发）。
+ *  - **失败闭合**：任何失败路径都尝试写恰好一次 `end`，并带上失败分类；
+ *    写 end 本身失败就故意留着未配对的 start，下次能被检测出来。
+ *  - **摘要必须更小**：产不出更短摘要 = `summary` 失败类（DSHA 同名）。
+ *  - **阈值按 DSHA**：`thresholdRatio` 作用在"窗口 - 预留"上，预留取 `min(headroomTokens, ctxWin/4)`，
+ *    避免 64K 窗口配 64K 预留把阈值算成 0（原来那套会变成每轮都压）。
  *
- * 只用 SharedPreferences + 追加写文件，不碰 Room 实体（C3 硬约束）。
+ * 仍然不碰 Room（C3）。
  */
 object HermesCompaction {
 
     private const val TAG = "HermesCompaction"
-    private const val PREFS = "hermes_compaction"
-    private const val KEY_PREFIX = "last_count_"
-    private const val LOG_DIR = "hermes"
-    private const val LOG_FILE = "compaction.jsonl"
+    private const val DIR = "hermes"
+    private const val EVENTS_DIR = "events"
 
-    /** 压完之后，至少要有这么多条新消息才允许再压一次。 */
-    private const val MIN_NEW_MESSAGES = 6
+    /** 事件名，和 DSHA 的会话事件同名。 */
+    const val EV_START = "compaction/start"
+    const val EV_SUMMARY = "compaction/summary"
+    const val EV_END = "compaction/end"
 
-    /** 超过阈值这么多（比例）时，无视上面的条数下限，紧急压缩。 */
-    private const val EMERGENCY_MARGIN = 0.15
+    /** 失败分类，和 DSHA `dsh-compaction-basic` 的分类同名。 */
+    enum class Failure(val code: String, val human: String) {
+        COMMIT("commit", "提交不洁（这一轮还在写）"),
+        CHANGED("changed", "压缩期间历史变了"),
+        SUMMARY("summary", "产不出更小的摘要"),
+        BUSY("busy", "已经有一次压缩在跑"),
+        CANCELLED("cancelled", "被取消"),
+        PERSISTENCE("persistence", "落盘失败")
+    }
 
-    /** 阈值上限：原来压缩后会 `+0.5` 拨高阈值，容易拨过 1.0 变成永不触发，这里压住。 */
-    private const val MAX_THRESHOLD = 0.95
-    private const val MIN_THRESHOLD = 0.30
+    /** 一次还没配对 end 的压缩。 */
+    class Open(val compactionId: String, val startedAt: Long, val seq: Long)
 
+    // ==================== 阈值与预留（DSHA 口径） ====================
+
+    private const val HEADROOM_TOKENS = 65536L
+
+    /** 预留：`min(headroomTokens, ctxWin/4)`。 */
+    fun headroom(ctxWindowTokens: Long): Long {
+        if (ctxWindowTokens <= 0L) return 0L
+        return minOf(HEADROOM_TOKENS, ctxWindowTokens / 4)
+    }
+
+    /** 可用来装历史的预算 = 窗口 - 预留。 */
+    fun usableTokens(ctxWindowTokens: Long): Long {
+        val usable = ctxWindowTokens - headroom(ctxWindowTokens)
+        return if (usable <= 0L) ctxWindowTokens else usable
+    }
+
+    /** 触发比例夹取：0.30~0.95，免得被"压完 +0.5"拨到 1.0 以上永不触发。 */
     fun clampThreshold(value: Double): Double =
-            if (value.isNaN()) MAX_THRESHOLD else value.coerceIn(MIN_THRESHOLD, MAX_THRESHOLD)
+            if (value.isNaN()) 0.80 else value.coerceIn(0.30, 0.95)
 
-    private fun prefs(context: Context) =
-            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    /** 该不该压：用量 / 可用预算 ≥ 比例。 */
+    fun shouldTrigger(usedTokens: Long, ctxWindowTokens: Long, thresholdRatio: Double): Boolean {
+        val usable = usableTokens(ctxWindowTokens)
+        if (usable <= 0L) return false
+        val ratio = usedTokens.toDouble() / usable.toDouble()
+        return ratio >= clampThreshold(thresholdRatio)
+    }
 
-    /** 上次压完时这个会话有多少条历史。 */
-    fun lastCount(context: Context, chatId: String?): Int {
-        if (chatId.isNullOrBlank()) return 0
+    // ==================== 事件日志 ====================
+
+    private fun eventsFile(context: Context, chatId: String): File {
+        val dir = File(context.applicationContext.filesDir, "$DIR/$EVENTS_DIR")
+        if (!dir.exists()) dir.mkdirs()
+        val safe = chatId.replace('/', '_').replace('\\', '_').ifBlank { "unknown" }
+        return File(dir, "$safe.jsonl")
+    }
+
+    private fun readEvents(context: Context, chatId: String?): List<JSONObject> {
+        if (chatId.isNullOrBlank()) return emptyList()
         return try {
-            prefs(context).getInt(KEY_PREFIX + chatId, 0)
+            val file = eventsFile(context, chatId)
+            if (!file.exists()) return emptyList()
+            file.readLines().mapNotNull { line ->
+                if (line.isBlank()) null
+                else
+                        try {
+                            JSONObject(line)
+                        } catch (e: Exception) {
+                            null
+                        }
+            }
         } catch (e: Exception) {
-            0
+            AppLogger.w(TAG, "读压缩事件失败", e)
+            emptyList()
         }
     }
 
-    /** 记下"压完了，历史这么多条"。 */
-    fun mark(context: Context, chatId: String?, messageCount: Int) {
+    private fun append(context: Context, chatId: String?, event: JSONObject) {
         if (chatId.isNullOrBlank()) return
         try {
-            prefs(context).edit().putInt(KEY_PREFIX + chatId, messageCount).apply()
+            val file = eventsFile(context, chatId)
+            val seq = readEvents(context, chatId).size.toLong() + 1L
+            event.put("seq", seq)
+            event.put("ts", System.currentTimeMillis())
+            file.appendText(event.toString() + "\n")
         } catch (e: Exception) {
-            AppLogger.w(TAG, "记账失败", e)
+            AppLogger.w(TAG, "写压缩事件失败", e)
         }
+    }
+
+    /** 扫日志找未配对 end 的 start。 */
+    fun inspectOpen(context: Context, chatId: String?): Open? {
+        val events = readEvents(context, chatId)
+        if (events.isEmpty()) return null
+        val closed = HashSet<String>()
+        events.forEach { e ->
+            if (e.optString("event") == EV_END) closed.add(e.optString("compactionId"))
+        }
+        for (i in events.indices.reversed()) {
+            val e = events[i]
+            if (e.optString("event") != EV_START) continue
+            val id = e.optString("compactionId")
+            if (id.isNotBlank() && id !in closed) {
+                return Open(id, e.optLong("ts"), e.optLong("seq"))
+            }
+        }
+        return null
+    }
+
+    /**
+     * 试着开始一次压缩。
+     *
+     * @return 拿到的 compactionId；null 表示已经有压缩在跑（busy），本次跳过。
+     */
+    fun tryStart(context: Context, chatId: String?, foldedMessages: Int, inputChars: Int): String? {
+        val open = inspectOpen(context, chatId)
+        if (open != null) {
+            // 锁的兜底：超过 10 分钟还没 end 的 start 视为陈旧（进程被杀），不再挡路
+            val age = System.currentTimeMillis() - open.startedAt
+            if (age < STALE_LOCK_MS) {
+                AppLogger.i(TAG, "已有压缩在跑（${open.compactionId}），本次跳过：busy")
+                return null
+            }
+            AppLogger.w(TAG, "发现陈旧的压缩锁（${open.compactionId}，${age}ms），按 cancelled 收尾")
+            append(
+                    context,
+                    chatId,
+                    JSONObject()
+                            .put("event", EV_END)
+                            .put("compactionId", open.compactionId)
+                            .put("failure", Failure.CANCELLED.code)
+                            .put("reason", "陈旧的 start，进程可能被杀")
+            )
+        }
+        val id = UUID.randomUUID().toString()
+        append(
+                context,
+                chatId,
+                JSONObject()
+                        .put("event", EV_START)
+                        .put("compactionId", id)
+                        .put("foldedMessages", foldedMessages)
+                        .put("inputChars", inputChars)
+        )
+        return id
+    }
+
+    /** 写下摘要正文（只记长度与开头，不把整篇摘要再存一遍，省空间）。 */
+    fun writeSummary(context: Context, chatId: String?, compactionId: String, summaryChars: Int, head: String) {
+        append(
+                context,
+                chatId,
+                JSONObject()
+                        .put("event", EV_SUMMARY)
+                        .put("compactionId", compactionId)
+                        .put("summaryChars", summaryChars)
+                        .put("head", head.take(200))
+        )
+    }
+
+    /** 收尾。failure 为空表示成功。任何路径都尝试写恰好一次 end。 */
+    fun finish(context: Context, chatId: String?, compactionId: String?, failure: Failure?, detail: String = "") {
+        if (compactionId.isNullOrBlank()) return
+        append(
+                context,
+                chatId,
+                JSONObject()
+                        .put("event", EV_END)
+                        .put("compactionId", compactionId)
+                        .put("failure", failure?.code ?: "")
+                        .put("reason", if (failure == null) detail else failure.human + if (detail.isBlank()) "" else "：$detail")
+        )
+    }
+
+    /** 诊断/重放：把某会话的压缩事件原样读出来。 */
+    fun replay(context: Context, chatId: String?, limit: Int = 50): String {
+        val events = readEvents(context, chatId)
+        if (events.isEmpty()) return "压缩事件：空"
+        return events.takeLast(limit).joinToString("\n") { it.toString() }
     }
 
     /** 会话被删时清账。 */
     fun forget(context: Context, chatId: String) {
         try {
-            prefs(context).edit().remove(KEY_PREFIX + chatId).apply()
+            val file = eventsFile(context, chatId)
+            if (file.exists()) file.delete()
         } catch (e: Exception) {
             AppLogger.w(TAG, "清账失败", e)
         }
     }
 
-    /**
-     * 这次该不该压。
-     *
-     * @param messageCount 当前历史条数
-     * @param usageRatio 当前上下文占用比例（0~1+），拿不到就传 0
-     * @param threshold 配置的阈值
-     */
-    fun allow(
-            context: Context,
-            chatId: String?,
-            messageCount: Int,
-            usageRatio: Double,
-            threshold: Double
-    ): Boolean {
-        val last = lastCount(context, chatId)
-        if (last <= 0) return true
-        val growth = messageCount - last
-        // 上一次压缩之后历史反而变短（被截断/被删）→ 重新记账，不拦
-        if (growth < 0) {
-            mark(context, chatId, messageCount)
-            return true
-        }
-        if (growth >= MIN_NEW_MESSAGES) return true
-        if (threshold > 0 && usageRatio >= clampThreshold(threshold + EMERGENCY_MARGIN)) {
-            AppLogger.w(
-                    TAG,
-                    "距上次压缩只多了 $growth 条，但上下文已用到 ${(usageRatio * 100).toInt()}%，紧急压缩"
-            )
-            return true
-        }
-        AppLogger.d(TAG, "距上次压缩只多了 $growth 条（下限 $MIN_NEW_MESSAGES），本次不压")
-        return false
-    }
-
-    /** 写一行压缩流水账。 */
-    fun logCompaction(
-            context: Context,
-            chatId: String?,
-            foldedMessages: Int,
-            inputChars: Int,
-            summaryChars: Int,
-            accepted: Boolean,
-            reason: String
-    ) {
-        try {
-            val dir = File(context.applicationContext.filesDir, LOG_DIR)
-            if (!dir.exists()) dir.mkdirs()
-            val line =
-                    JSONObject().apply {
-                        put("ts", System.currentTimeMillis())
-                        put("chatId", chatId ?: "")
-                        put("folded", foldedMessages)
-                        put("inputChars", inputChars)
-                        put("summaryChars", summaryChars)
-                        put("accepted", accepted)
-                        put("reason", reason)
-                    }
-            File(dir, LOG_FILE).appendText(line.toString() + "\n")
-        } catch (e: Exception) {
-            AppLogger.w(TAG, "流水账写入失败", e)
-        }
-    }
-
-    /** 诊断用：最近几次压缩。 */
-    fun recent(context: Context, limit: Int = 10): String {
-        return try {
-            val file = File(File(context.applicationContext.filesDir, LOG_DIR), LOG_FILE)
-            if (!file.exists()) return "压缩流水账：空"
-            file.readLines().takeLast(limit).joinToString("\n")
-        } catch (e: Exception) {
-            "压缩流水账读取失败：" + (e.message ?: "")
-        }
-    }
+    private const val STALE_LOCK_MS = 10 * 60 * 1000L
 }

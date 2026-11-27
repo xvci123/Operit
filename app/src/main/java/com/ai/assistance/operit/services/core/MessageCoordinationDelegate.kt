@@ -689,32 +689,23 @@ class MessageCoordinationDelegate(
             val currentMessages = runBlocking { chatHistoryDelegate.getCurrentRuntimeChatHistorySnapshot() }
             val currentTokens = tokenStatsDelegate.currentWindowSizeFlow.value
 
+            // DSHA 口径：判定用量时按"窗口 - 预留"算预算（预留 = min(65536, 窗口/4)），
+            // 否则小窗口配默认预留会把阈值算成 0，变成每轮都压。
+            val summaryWindowTokens =
+                    HermesCompaction.usableTokens(maxTokensForSend.toLong()).toInt()
             val isShouldGenerateSummary = AIMessageManager.shouldGenerateSummary(
                 messages = currentMessages,
                 currentTokens = currentTokens,
-                maxTokens = maxTokensForSend,
+                maxTokens = summaryWindowTokens,
                 tokenUsageThreshold = tokenUsageThresholdForSend,
                 enableSummary = chatContextSettings.enableSummary,
                 enableSummaryByMessageCount = chatContextSettings.enableSummaryByMessageCount,
                 summaryMessageCountThreshold = chatContextSettings.summaryMessageCountThreshold
             )
 
-            // 阶段 6 守卫一：区间不重叠。上一次压缩之后没多出足够多的新消息，就不再压一次，
-            // 免得"刚压完 → 条数仍超阈值 → 立刻再压"，把刚保留的最近几轮又吃进去。
-            val usageRatio =
-                    if (maxTokensForSend > 0) currentTokens.toDouble() / maxTokensForSend.toDouble()
-                    else 0.0
-            val summaryAllowed =
-                    isShouldGenerateSummary &&
-                            HermesCompaction.allow(
-                                    context = context,
-                                    chatId = chatId,
-                                    messageCount = currentMessages.size,
-                                    usageRatio = usageRatio,
-                                    threshold = tokenUsageThresholdForSend
-                            )
-
-            if (summaryAllowed) {
+            // 并发/重复压缩由 HermesCompaction 用会话事件日志当锁来挡（DSHA 口径，D-12），
+            // 这里只负责"该不该压"的判断。
+            if (isShouldGenerateSummary) {
                 val snapshotMessages = currentMessages.toList()
                 val insertPosition = chatHistoryDelegate.findProperSummaryPosition(snapshotMessages)
                 val beforeTimestamp = snapshotMessages.getOrNull(insertPosition - 1)?.timestamp
@@ -731,9 +722,6 @@ class MessageCoordinationDelegate(
                     chatModelIndexOverride = resolvedChatModelIndexOverride,
                     memorySpaceIdOverride = resolvedMemorySpaceIdOverride
                 )
-
-                // 记下"压完了，历史这么多条"，供下一次判断区间是否重叠
-                HermesCompaction.mark(context, chatId, currentMessages.size)
 
                 // 本次请求的Token阈值在原基础上增加 0.5（但压住上限，避免拨过 1.0 变成永不触发）
                 tokenUsageThresholdForSend =
@@ -1418,29 +1406,19 @@ class MessageCoordinationDelegate(
                 .toLong()
                 .coerceIn(0L, Int.MAX_VALUE.toLong())
                 .toInt()
+        val summaryWindowTokens2 = HermesCompaction.usableTokens(maxTokens.toLong()).toInt()
         val shouldSummarize = AIMessageManager.shouldGenerateSummary(
             messages = currentMessages,
             currentTokens = currentTokens,
-            maxTokens = maxTokens,
+            maxTokens = summaryWindowTokens2,
             tokenUsageThreshold = chatContextSettings.summaryTokenThreshold.toDouble(),
             enableSummary = chatContextSettings.enableSummary,
             enableSummaryByMessageCount = chatContextSettings.enableSummaryByMessageCount,
             summaryMessageCountThreshold = chatContextSettings.summaryMessageCountThreshold
         )
-        val usageRatio2 =
-                if (maxTokens > 0) currentTokens.toDouble() / maxTokens.toDouble() else 0.0
-        val allowed2 =
-                shouldSummarize &&
-                        HermesCompaction.allow(
-                                context = context,
-                                chatId = chatId,
-                                messageCount = currentMessages.size,
-                                usageRatio = usageRatio2,
-                                threshold = chatContextSettings.summaryTokenThreshold.toDouble()
-                        )
-        if (allowed2) {
-            HermesCompaction.mark(context, chatId, currentMessages.size)
+        if (shouldSummarize) {
             // 群组编排后的总结，标记为群聊模式
+            // 并发与重复由压缩事件日志当锁来挡（见 HermesCompaction.tryStart）
             summarizeHistory(
                 autoContinue = false,
                 promptFunctionType = promptFunctionType,
@@ -1907,6 +1885,21 @@ class MessageCoordinationDelegate(
         _isSummarizing.value = true
         val currentChatId = chatIdOverride ?: chatHistoryDelegate.currentChatId.value
         _summarizingChatId.value = currentChatId
+        // D-12：用会话事件日志当锁（DSHA 的 compaction/start … /end 必须配对）。
+        // 已经有一次没配对上 end（且不陈旧）就跳过，避免两次压缩同时折叠同一段历史。
+        val compactionId =
+                HermesCompaction.tryStart(
+                        context = context,
+                        chatId = currentChatId,
+                        foldedMessages = 0,
+                        inputChars = 0
+                )
+        if (compactionId == null) {
+            _isSummarizing.value = false
+            _summarizingChatId.value = null
+            AppLogger.d(TAG, "压缩锁被占用（busy），本次跳过")
+            return false
+        }
         if (currentChatId != null) {
             messageProcessingDelegate.setSuppressIdleCompletedStateForChat(currentChatId, true)
             messageProcessingDelegate.setInputProcessingStateForChat(
@@ -1964,22 +1957,34 @@ class MessageCoordinationDelegate(
             val summaryAccepted =
                 summaryMessage != null &&
                         (foldedChars <= 0 || summaryMessage.content.length < foldedChars)
-            if (summaryMessage != null) {
-                HermesCompaction.logCompaction(
+            if (summaryMessage != null && summaryAccepted) {
+                // DSHA 的 compaction/summary：正文仍在 Room 里，账本只记长度与开头，不重复存
+                HermesCompaction.writeSummary(
                         context = context,
                         chatId = currentChatId,
-                        foldedMessages = foldedCount,
-                        inputChars = foldedChars,
+                        compactionId = compactionId,
                         summaryChars = summaryMessage.content.length,
-                        accepted = summaryAccepted,
-                        reason = if (summaryAccepted) "ok" else "摘要不比原文短，拒收"
+                        head = summaryMessage.content
                 )
-                if (!summaryAccepted) {
-                    AppLogger.w(
-                            TAG,
-                            "摘要没有更短（${summaryMessage.content.length} >= $foldedChars），本次不落库"
-                    )
-                }
+                HermesCompaction.finish(
+                        context = context,
+                        chatId = currentChatId,
+                        compactionId = compactionId,
+                        failure = null,
+                        detail = "折叠 $foldedCount 条 / ${foldedChars} 字 → ${summaryMessage.content.length} 字"
+                )
+            } else {
+                AppLogger.w(
+                        TAG,
+                        "压缩失败（summary）：摘要 ${summaryMessage?.content?.length ?: 0} 字 / 原文 $foldedChars 字"
+                )
+                HermesCompaction.finish(
+                        context = context,
+                        chatId = currentChatId,
+                        compactionId = compactionId,
+                        failure = HermesCompaction.Failure.SUMMARY,
+                        detail = if (summaryMessage == null) "没有产出摘要" else "摘要不比原文短"
+                )
             }
 
             if (summaryMessage != null && summaryAccepted) {
@@ -2010,8 +2015,21 @@ class MessageCoordinationDelegate(
         } catch (e: CancellationException) {
             // 总结被取消，这是正常流程
             AppLogger.d(TAG, "总结操作被取消")
+            HermesCompaction.finish(
+                    context = context,
+                    chatId = currentChatId,
+                    compactionId = compactionId,
+                    failure = HermesCompaction.Failure.CANCELLED
+            )
             throw e // 重新抛出取消异常，让协程正确取消
         } catch (e: Exception) {
+            HermesCompaction.finish(
+                    context = context,
+                    chatId = currentChatId,
+                    compactionId = compactionId,
+                    failure = HermesCompaction.Failure.PERSISTENCE,
+                    detail = e.message ?: e.javaClass.simpleName
+            )
             AppLogger.e(TAG, "生成总结时出错: ${e.message}", e)
             uiStateDelegate.showErrorMessage(
                 context.getString(

@@ -688,15 +688,57 @@ class ConversationService(
     fun normalizeConversationHistoryForModel(
         chatHistory: List<PromptTurn>
     ): List<PromptTurn> {
+        // D-13（DSHA 的 compaction-tool-result-pruner）：只裁**历史里的旧工具输出**，
+        // 头尾保留、中段省略；这一轮刚跑出来的结果一条都不裁（D-10 仍然有效）。
+        val totalToolResults = chatHistory.count { it.kind == PromptTurnKind.TOOL_RESULT }
+        var seenToolResults = 0
         return chatHistory.map { turn ->
-            when (turn.kind) {
-                PromptTurnKind.ASSISTANT,
-                PromptTurnKind.TOOL_CALL,
-                PromptTurnKind.TOOL_RESULT -> turn.copy(content = normalizeToolResultMarkupForModel(turn.content))
-                else -> turn
+            val normalized =
+                when (turn.kind) {
+                    PromptTurnKind.ASSISTANT,
+                    PromptTurnKind.TOOL_CALL,
+                    PromptTurnKind.TOOL_RESULT -> turn.copy(content = normalizeToolResultMarkupForModel(turn.content))
+                    else -> turn
+                }
+            if (normalized.kind != PromptTurnKind.TOOL_RESULT) {
+                normalized
+            } else {
+                seenToolResults += 1
+                val newer = totalToolResults - seenToolResults
+                if (newer >= KEEP_RECENT_TOOL_RESULTS) {
+                    normalized.copy(content = pruneOldToolResult(normalized.content))
+                } else {
+                    normalized
+                }
             }
         }
     }
+
+    /**
+     * 老工具输出：留头留尾、掐掉中段，并写清省略了多少字。
+     *
+     * 为什么敢掐：这几条输出已经在历史里放了很多轮，模型还需要的概率低；
+     * 真需要可以重新执行命令或读文件。刚跑出来的结果不经过这里（见上面的判断）。
+     */
+    private fun pruneOldToolResult(content: String): String {
+        if (content.length <= PRUNE_MIN_CHARS) return content
+        val head = content.take(PRUNE_HEAD_CHARS)
+        val tail = content.takeLast(PRUNE_TAIL_CHARS)
+        val omitted = content.length - head.length - tail.length
+        if (omitted <= 0) return content
+        return head +
+                "\n…（更早的工具输出中段已省略 ${omitted} 字；需要时重新执行命令或读文件）…\n" +
+                tail
+    }
+
+    /** 最近几条工具结果保持原样。 */
+    private val KEEP_RECENT_TOOL_RESULTS = 3
+
+    /** 短于这个长度不裁（掐了也没省多少）。 */
+    private val PRUNE_MIN_CHARS = 4000
+
+    private val PRUNE_HEAD_CHARS = 1500
+    private val PRUNE_TAIL_CHARS = 1500
 
     private fun normalizeToolResultMarkupForModel(content: String): String {
         return ChatMarkupRegex.toolResultTagWithAttrs.replace(content) { matchResult ->

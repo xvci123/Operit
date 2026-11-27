@@ -2333,18 +2333,7 @@ class EnhancedAIService private constructor(private val context: Context) {
         val baseToolResultMessage =
             toolResultMessageOverride ?: ConversationMarkupManager.buildToolResultMessage(results)
 
-        // D-09 注入点：工具结果已经生成、下一次请求模型之前。
-        // 这一轮运行期间新到达的内部唤醒（作业结算 / 子代理返回 / 目标续跑）在这里被拼到
-        // 工具结果后面，模型下一步就能看到——不用等这一整轮跑完再另外开一轮。
-        // 没有东西可注入时 drainBlock 返回空串，行为与原来完全一致。
-        val steerBlock =
-            try {
-                HermesSteer.drainBlock(this@EnhancedAIService.context, chatId)
-            } catch (e: Exception) {
-                AppLogger.w(TAG, "注入下一步失败（已忽略）", e)
-                ""
-            }
-        val toolResultMessage = baseToolResultMessage + steerBlock
+        val toolResultMessage = baseToolResultMessage
 
         if (toolResultMessage.isBlank()) {
             AppLogger.w(TAG, "工具结果消息为空，跳过后续AI请求")
@@ -2378,6 +2367,18 @@ class EnhancedAIService private constructor(private val context: Context) {
                 toolName = toolNames.ifBlank { null }
             )
         )
+
+        // D-09 注入点：工具结果已经进上下文、下一次请求模型之前。
+        // 这一轮运行期间新到达的内部唤醒（作业结算 / 子代理返回 / 目标续跑）作为
+        // **独立的一条消息**插在工具结果之后（DSHA 的 inject 形态），不多开一轮，也不打断当前步。
+        // 没有东西可注入时这里什么都不做，行为与原来完全一致。
+        try {
+            HermesSteer.drainTurns(this@EnhancedAIService.context, chatId).forEach { turn ->
+                context.conversationHistory.add(turn)
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "注入下一步失败（已忽略）", e)
+        }
 
         val normalizedChatHistory =
             conversationService.normalizeConversationHistoryForModel(context.conversationHistory)

@@ -1,6 +1,8 @@
 package com.ai.assistance.operit.core.agent.wake
 
 import android.content.Context
+import com.ai.assistance.operit.core.chat.hooks.PromptTurn
+import com.ai.assistance.operit.core.chat.hooks.PromptTurnKind
 import com.ai.assistance.operit.util.AppLogger
 
 /**
@@ -14,7 +16,7 @@ import com.ai.assistance.operit.util.AppLogger
  * 既不打断当前步，也不用多开一轮。
  *
  * 落点：`EnhancedAIService.processToolResults()` 组装工具结果消息的地方
- * （见那边对 [drainBlock] 的调用）。
+ * （见那边对 [drainTurns] 的调用）。
  *
  * 约束：
  *  - 只在**这一轮确实有工具在跑**时才允许注入。否则说明这一轮正卡在最后一次模型请求里，
@@ -62,23 +64,24 @@ object HermesSteer {
     }
 
     /**
-     * 取走并渲染成一段可以直接拼在工具结果后面的文本。
+     * 取走并转成**独立的一条消息**（D-09 的 inject 语义，按 DSHA 原版形态）。
      *
-     * 拼在工具结果消息里，而不是另开一条消息：这样模型下一步一定会看到，
-     * 也不会破坏"user / assistant / tool"三类的顺序约束。
+     * 早先的版本是把这段话拼进工具输出的正文，模型看到的是"命令输出里夹了一句备注"；
+     * DSHA 是单独发一条注入消息进 transcript，模型看到的是一条独立通知。
+     * 这里返回 `PromptTurn(kind = USER)`，由调用方紧跟在工具结果后面塞进本轮上下文。
+     *
      * 取走后同步把磁盘上的唤醒事件标成已派发，避免同一个结果既注入又再叫醒一次。
      */
-    fun drainBlock(context: Context, chatId: String?): String {
-        if (chatId.isNullOrBlank()) return ""
+    fun drainTurns(context: Context, chatId: String?): List<PromptTurn> {
+        if (chatId.isNullOrBlank()) return emptyList()
         val taken: List<Pending> =
                 synchronized(lock) {
-                    val queue = queues[chatId] ?: return ""
-                    if (queue.isEmpty()) return ""
+                    val queue = queues[chatId]
+                    if (queue == null || queue.isEmpty()) return emptyList()
                     val copy = queue.toList()
                     queue.clear()
                     copy
                 }
-        if (taken.isEmpty()) return ""
         taken.forEach { p ->
             p.injected = true
             try {
@@ -88,16 +91,19 @@ object HermesSteer {
             }
         }
         AppLogger.i(TAG, "注入 ${taken.size} 条到下一步（会话 $chatId）")
-        return buildString {
-            append("\n\n")
-            append("<hermes_steer>")
-            append("\n（下面是这一轮运行期间新到达的通知，请你先看一眼再决定下一步动作；")
-            append("不需要为此道歉，也不要重复已经做过的事。）\n")
-            taken.forEach { p ->
-                append("\n【").append(p.title).append("】\n")
-                append(p.text.trim()).append('\n')
-            }
-            append("</hermes_steer>")
+        return taken.map { p ->
+            PromptTurn(
+                    kind = PromptTurnKind.USER,
+                    content =
+                            buildString {
+                                append(p.title)
+                                append('\n')
+                                append(p.text.trim())
+                                append('\n')
+                                append("（这是运行期间新到达的通知，不是用户的回复。请先确认它是否需要你改变当前做法；")
+                                append("不需要就不要重复已经做过的事，也不要为它道歉。）")
+                            }
+            )
         }
     }
 

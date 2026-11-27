@@ -62,7 +62,7 @@ object ModelConfigDefaults {
         const val DEFAULT_MAX_CONTEXT_LENGTH = 200.0f
         const val DEFAULT_ENABLE_MAX_CONTEXT_MODE = false
         const val DEFAULT_ENABLE_TOOL_CALL = true
-        const val DEFAULT_SUMMARY_TOKEN_THRESHOLD = 0.70f
+        const val DEFAULT_SUMMARY_TOKEN_THRESHOLD = 0.80f
         const val DEFAULT_ENABLE_SUMMARY = true
         const val DEFAULT_ENABLE_SUMMARY_BY_MESSAGE_COUNT = true
         const val DEFAULT_SUMMARY_MESSAGE_COUNT_THRESHOLD = 16
