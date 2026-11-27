@@ -921,6 +921,9 @@ val hermesFetchLibnode by tasks.registering {
 
         var cmake = File(pkg, "CMakeLists.txt").readText()
             .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
+            // 它的源文件写的是 src/main/cpp/xxx.cpp，我们是平铺的，去掉前缀
+            .replace("src/main/cpp/", "")
+            .replace("src/main/jni/", "")
         File(cppDst, "CMakeLists.txt").writeText(cmake)
 
         println("### HERMES: node bridge ready; libnode.so ${soDst.length() / 1048576} MB")
