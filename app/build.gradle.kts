@@ -889,15 +889,18 @@ val hermesFetchLibnode by tasks.registering {
             URI(url).toURL().openStream().use { i -> tgz.outputStream().use { o -> i.copyTo(o) } }
         }
         val unpacked = File(work, "unpacked")
-        if (!File(unpacked, "package").exists()) {
-            unpacked.mkdirs()
-            project.exec { commandLine("tar", "-xzf", tgz.absolutePath, "-C", unpacked.absolutePath) }
-        }
+        unpacked.deleteRecursively()
+        unpacked.mkdirs()
+        project.exec { commandLine("tar", "-xzf", tgz.absolutePath, "-C", unpacked.absolutePath) }
         val pkg = File(unpacked, "package")
         val cppDst = File(projectDir, "src/main/cpp/hermes")
         cppDst.mkdirs()
         val cppNames = cppDst.listFiles()?.filter { it.extension == "cpp" }?.map { it.name }.orEmpty()
         println("### HERMES: cpp files = " + cppNames.joinToString(","))
+        if (cppNames.isEmpty()) {
+            val tree = File(pkg, "src/android").walkTopDown().filter { it.isFile }.map { it.path.replace(pkg.path + "/", "") }.take(40).toList()
+            error("### HERMES: no cpp found. tree=" + tree.joinToString(" | "))
+        }
         var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
             .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
         // 它引用的文件名未必都在包里：按实际存在的 cpp 修，缺哪个就把那行换掉/删掉
