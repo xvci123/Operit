@@ -3,6 +3,7 @@ package com.ai.assistance.operit.api.chat
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.ai.assistance.operit.core.agent.wake.HermesSteer
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.util.ChatMarkupRegex
 import com.ai.assistance.operit.util.ChatTrace
@@ -2329,8 +2330,21 @@ class EnhancedAIService private constructor(private val context: Context) {
             return
         }
         val toolNames = results.joinToString(", ") { it.toolName }
-        val toolResultMessage =
+        val baseToolResultMessage =
             toolResultMessageOverride ?: ConversationMarkupManager.buildToolResultMessage(results)
+
+        // D-09 注入点：工具结果已经生成、下一次请求模型之前。
+        // 这一轮运行期间新到达的内部唤醒（作业结算 / 子代理返回 / 目标续跑）在这里被拼到
+        // 工具结果后面，模型下一步就能看到——不用等这一整轮跑完再另外开一轮。
+        // 没有东西可注入时 drainBlock 返回空串，行为与原来完全一致。
+        val steerBlock =
+            try {
+                HermesSteer.drainBlock(this@EnhancedAIService.context, chatId)
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "注入下一步失败（已忽略）", e)
+                ""
+            }
+        val toolResultMessage = baseToolResultMessage + steerBlock
 
         if (toolResultMessage.isBlank()) {
             AppLogger.w(TAG, "工具结果消息为空，跳过后续AI请求")

@@ -78,6 +78,8 @@ data class WakeEvent(
         val createdAt: Long = System.currentTimeMillis(),
         var status: WakeStatus = WakeStatus.PENDING,
         var attempts: Int = 0,
+        /** 试过几次"塞进当前轮下一步"（注入没被取走就回到排队） */
+        var injectAttempts: Int = 0,
         var dispatchedAt: Long? = null,
         var finishedAt: Long? = null,
         var note: String = ""
@@ -94,6 +96,7 @@ data class WakeEvent(
                 put("createdAt", createdAt)
                 put("status", status.name)
                 put("attempts", attempts)
+                put("injectAttempts", injectAttempts)
                 put("dispatchedAt", dispatchedAt ?: JSONObject.NULL)
                 put("finishedAt", finishedAt ?: JSONObject.NULL)
                 put("note", note)
@@ -126,6 +129,7 @@ data class WakeEvent(
                                     WakeStatus.PENDING
                                 },
                         attempts = obj.optInt("attempts"),
+                        injectAttempts = obj.optInt("injectAttempts"),
                         dispatchedAt =
                                 if (obj.isNull("dispatchedAt")) null else obj.optLong("dispatchedAt"),
                         finishedAt =

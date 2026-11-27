@@ -56,7 +56,9 @@ object FunctionalPrompts {
 
         **内容要求：**
         1. 语言风格：专业、清晰、客观.
-        2. 内容长度：不要限制字数，根据对话内容的复杂程度和重要性，自行决定合适的长度。可以写得详细一些，确保重要信息不丢失。宁可内容多一点，也不要因为过度精简导致关键信息丢失或失真。每个部分都要具备充分篇幅，绝不能以一句话敷衍.
+        2. 内容长度（硬要求）：摘要必须比输入材料短得多。总长度控制在输入材料的 35% 以内，且不超过 2000 字；输入材料本身很短（少于 600 字）时可以写得精简一些，但绝不允许比原文更长。
+           这一条和"信息完整"冲突时，用压缩措辞、合并同类项、删除过程性描述来解决，而不是靠堆字数。不要复述原文，不要保留示例和寒暄，只留事实、结论、参数和下一步。
+           常见错误：把上一版摘要原样扩写。上一版摘要只作为素材，最终长度必须明显短于"上一版摘要 + 新对话"的总长度。
         3. 信息完整性：优先保证信息的完整性和准确性，技术与非技术内容都需提供必要证据或引用.
         4. 内容还原：摘要既要说明“过程如何推进”，也要写清“实际产出/讨论内容是什么”，必要时引用结果文本、结论、代码片段或参数，确保在没有原始对话的情况下依然能完全还原信息本身.
         5. 目标：生成的摘要必须是自包含的。即使AI完全忘记了之前的对话，仅凭这份摘要也能够准确理解历史背景、当前状态、具体进度和下一步行动.
@@ -104,7 +106,7 @@ object FunctionalPrompts {
 
         **Content requirements:**
         1. Style: professional, clear, objective.
-        2. Length: do not limit length. Decide an appropriate length based on complexity and importance. Prefer being detailed to avoid missing key information.
+        2. Length (hard requirement): the summary MUST be substantially shorter than the input material — at most 35% of its length and never more than 2000 words. When this conflicts with completeness, compress wording, merge duplicates and drop process narration instead of adding volume. Never expand the previous summary verbatim; the result must be clearly shorter than "previous summary + new conversation" combined.
         3. Completeness: prioritize completeness and accuracy. Provide evidence/quotes when needed.
         4. Reconstruction: the summary must describe both “how the process progressed” and “what the actual outputs/discussion were”. Quote resulting text, conclusions, code snippets, or parameters when needed.
         5. Goal: the summary must be self-contained so that even if the AI forgets the original conversation, it can fully reconstruct context, current status, progress, and next actions.

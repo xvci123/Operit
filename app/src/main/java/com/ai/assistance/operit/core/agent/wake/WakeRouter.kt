@@ -43,6 +43,9 @@ object WakeRouter {
     /** 派发最多重试几次。 */
     private const val MAX_DISPATCH_ATTEMPTS = 3
 
+    /** 注入最多试几次（每次 tick 一次，约 700ms 一次，250 次约 3 分钟）。 */
+    private const val MAX_INJECT_ATTEMPTS = 250
+
     /** 连续内部唤醒到几次开始在聊天里提示（只提示，不刹停）。 */
     const val WARN_AFTER = 3
 
@@ -147,6 +150,33 @@ object WakeRouter {
         event.finishedAt = System.currentTimeMillis()
         WakeInboxStore.advance(appContext, event)
         AppLogger.i(TAG, "唤醒作废（已被 await）：$sourceId")
+    }
+
+    /**
+     * 某条唤醒已经被塞进当前轮的下一步并被模型读到（由 [HermesSteer.drainBlock] 回调）。
+     * 状态推到 DISPATCHED，等这一轮结束由 [finishSettledTurns] 收账。
+     */
+    fun markInjected(context: Context, sourceId: String) {
+        val appContext = context.applicationContext
+        init(appContext)
+        val event = WakeInboxStore.bySourceId(appContext, sourceId) ?: return
+        if (event.status != WakeStatus.PENDING && event.status != WakeStatus.DISPATCHED) return
+        val now = System.currentTimeMillis()
+        event.status = WakeStatus.DISPATCHED
+        event.dispatchedAt = now
+        event.note = "已注入当前轮下一步（未单独开一轮）"
+        WakeInboxStore.advance(appContext, event)
+        val meta = WakeInboxStore.meta(appContext)
+        WakeInboxStore.updateMeta(
+                appContext,
+                meta.copy(
+                        totalWakes = meta.totalWakes + 1,
+                        consecutiveInternalWakes =
+                                if (event.sourceKind.isExternal) meta.consecutiveInternalWakes
+                                else meta.consecutiveInternalWakes + 1
+                )
+        )
+        AppLogger.i(TAG, "注入已送达：$sourceId")
     }
 
     /** 暂停/恢复内部自唤醒。外部自动化不受影响。 */
@@ -258,6 +288,32 @@ object WakeRouter {
             return
         }
         if (isChatBusy(context, core, targetChatId)) {
+            // D-09：会话忙的时候不再一律排队。
+            // 内部唤醒（作业结算、子代理返回、目标续跑）走 inject：塞进这一轮的
+            // "下一步"（工具结果回来、重新请求模型之前），由模型在下一步自然看到；
+            // 外部自动化仍然排队，那是用户能看见的事件，不该被动塞进 AI 的思考里。
+            if (!event.sourceKind.isExternal && toolsRunning(context, core, targetChatId)) {
+                val pushed =
+                        HermesSteer.push(
+                                chatId = targetChatId,
+                                sourceId = event.sourceId,
+                                title = event.sourceKind.cardTitle,
+                                text = event.payload
+                        )
+                event.injectAttempts += 1
+                event.note =
+                        if (pushed) "已排进当前轮的下一步（不等这一轮结束）"
+                        else "已在当前轮待注入"
+                if (event.injectAttempts <= MAX_INJECT_ATTEMPTS) {
+                    WakeInboxStore.advance(context, event)
+                    AppLogger.i(TAG, "唤醒改走注入：${event.id}（${event.note}）")
+                    return
+                }
+                // 试了太多次还没被取走：说明这一轮的缝一直没出现，退回排队
+                event.note = "这一轮迟迟没有下一步可取，改回排队"
+                WakeInboxStore.advance(context, event)
+                AppLogger.w(TAG, "注入放弃，改为排队：${event.id}")
+            }
             // 用户正在用这个会话：排队，等这一轮结束。这是"用户操作优先"那一条。
             return
         }
@@ -315,6 +371,25 @@ object WakeRouter {
                 AppLogger.w(TAG, "获取 ChatService 失败", e)
                 null
             }
+
+    /**
+     * 这一轮是不是正卡在"工具在跑"的阶段。
+     *
+     * 只有在工具跑着的时候，下一步的缝才一定会出现；如果只是流式/加载中而没有工具在跑，
+     * 说明这一轮正在最后那次模型请求里，这时候注入没人接。判断不出来一律当成没有。
+     */
+    private fun toolsRunning(
+            context: Context,
+            core: com.ai.assistance.operit.services.ChatServiceCore,
+            chatId: String
+    ): Boolean {
+        return try {
+            val tools = core.currentTurnToolInvocationCountByChatId.value[chatId] ?: 0
+            tools > 0
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     /** 这个会话现在能不能接新一轮。三个条件一起看：正在流式、正在加载、当前轮有工具在跑。 */
     private fun isChatBusy(

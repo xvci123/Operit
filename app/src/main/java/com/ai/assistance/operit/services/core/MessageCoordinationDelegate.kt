@@ -1,6 +1,7 @@
 package com.ai.assistance.operit.services.core
 
 import android.content.Context
+import com.ai.assistance.operit.core.chat.HermesCompaction
 import com.ai.assistance.operit.R
 import com.ai.assistance.operit.util.AppLogger
 import com.ai.assistance.operit.api.chat.EnhancedAIService
@@ -698,7 +699,22 @@ class MessageCoordinationDelegate(
                 summaryMessageCountThreshold = chatContextSettings.summaryMessageCountThreshold
             )
 
-            if (isShouldGenerateSummary) {
+            // 阶段 6 守卫一：区间不重叠。上一次压缩之后没多出足够多的新消息，就不再压一次，
+            // 免得"刚压完 → 条数仍超阈值 → 立刻再压"，把刚保留的最近几轮又吃进去。
+            val usageRatio =
+                    if (maxTokensForSend > 0) currentTokens.toDouble() / maxTokensForSend.toDouble()
+                    else 0.0
+            val summaryAllowed =
+                    isShouldGenerateSummary &&
+                            HermesCompaction.allow(
+                                    context = context,
+                                    chatId = chatId,
+                                    messageCount = currentMessages.size,
+                                    usageRatio = usageRatio,
+                                    threshold = tokenUsageThresholdForSend
+                            )
+
+            if (summaryAllowed) {
                 val snapshotMessages = currentMessages.toList()
                 val insertPosition = chatHistoryDelegate.findProperSummaryPosition(snapshotMessages)
                 val beforeTimestamp = snapshotMessages.getOrNull(insertPosition - 1)?.timestamp
@@ -716,8 +732,12 @@ class MessageCoordinationDelegate(
                     memorySpaceIdOverride = resolvedMemorySpaceIdOverride
                 )
 
-                // 本次请求的Token阈值在原基础上增加 0.5
-                tokenUsageThresholdForSend += 0.5
+                // 记下"压完了，历史这么多条"，供下一次判断区间是否重叠
+                HermesCompaction.mark(context, chatId, currentMessages.size)
+
+                // 本次请求的Token阈值在原基础上增加 0.5（但压住上限，避免拨过 1.0 变成永不触发）
+                tokenUsageThresholdForSend =
+                        HermesCompaction.clampThreshold(tokenUsageThresholdForSend + 0.5)
             }
         }
 
@@ -1407,7 +1427,19 @@ class MessageCoordinationDelegate(
             enableSummaryByMessageCount = chatContextSettings.enableSummaryByMessageCount,
             summaryMessageCountThreshold = chatContextSettings.summaryMessageCountThreshold
         )
-        if (shouldSummarize) {
+        val usageRatio2 =
+                if (maxTokens > 0) currentTokens.toDouble() / maxTokens.toDouble() else 0.0
+        val allowed2 =
+                shouldSummarize &&
+                        HermesCompaction.allow(
+                                context = context,
+                                chatId = chatId,
+                                messageCount = currentMessages.size,
+                                usageRatio = usageRatio2,
+                                threshold = chatContextSettings.summaryTokenThreshold.toDouble()
+                        )
+        if (allowed2) {
+            HermesCompaction.mark(context, chatId, currentMessages.size)
             // 群组编排后的总结，标记为群聊模式
             summarizeHistory(
                 autoContinue = false,
@@ -1915,6 +1947,11 @@ class MessageCoordinationDelegate(
             val afterTimestamp =
                 summaryInsertReferenceMessages.getOrNull(insertPosition)?.timestamp
             val summaryConfig = readSummaryConfig()
+            // 阶段 6 守卫二：要折叠的那一段原始字数（含上一版摘要，它就在这一段里）。
+            // 摘要写得不比原文短，压了等于白压——下一轮还得再压一次，越滚越大。
+            val foldedChars =
+                summaryInsertReferenceMessages.take(insertPosition).sumOf { it.content.length }
+            val foldedCount = insertPosition.coerceAtLeast(0)
             val summaryMessage =
                 AIMessageManager.summarizeMemory(
                     service,
@@ -1924,7 +1961,28 @@ class MessageCoordinationDelegate(
                     summaryConfig
                 )
 
+            val summaryAccepted =
+                summaryMessage != null &&
+                        (foldedChars <= 0 || summaryMessage.content.length < foldedChars)
             if (summaryMessage != null) {
+                HermesCompaction.logCompaction(
+                        context = context,
+                        chatId = currentChatId,
+                        foldedMessages = foldedCount,
+                        inputChars = foldedChars,
+                        summaryChars = summaryMessage.content.length,
+                        accepted = summaryAccepted,
+                        reason = if (summaryAccepted) "ok" else "摘要不比原文短，拒收"
+                )
+                if (!summaryAccepted) {
+                    AppLogger.w(
+                            TAG,
+                            "摘要没有更短（${summaryMessage.content.length} >= $foldedChars），本次不落库"
+                    )
+                }
+            }
+
+            if (summaryMessage != null && summaryAccepted) {
                 chatHistoryDelegate.addSummaryMessage(
                     summaryMessage = summaryMessage,
                     beforeTimestamp = beforeTimestamp,
@@ -1942,9 +2000,12 @@ class MessageCoordinationDelegate(
                     memorySpaceIdOverride = effectiveMemorySpaceIdOverride
                 )
                 summarySuccess = true
-            } else {
+            } else if (summaryMessage == null) {
                 AppLogger.w(TAG, "总结失败或无需总结")
                 uiStateDelegate.showErrorMessage(context.getString(R.string.chat_summarize_failed_no_valid_summary))
+            } else {
+                // 摘要不比原文短：这是"压了等于白压"，不是失败。不弹错打扰用户，只留流水账。
+                AppLogger.i(TAG, "摘要被拒收，本轮不做压缩（详见压缩流水账）")
             }
         } catch (e: CancellationException) {
             // 总结被取消，这是正常流程
