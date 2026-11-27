@@ -38,6 +38,26 @@ object SystemToolPrompts {
 """.trimEnd()
     }
     
+
+    /**
+     * 本轮新增（D-11 / B-2）：把**已经有说明、但只在 CLI 隐藏目录里**的几个工具放出来。
+     *
+     * 背景：`ask_user` / `spawn_subagent` / `job_output` / `job_kill` / `write_file`
+     * 在 `SystemToolPromptsInternal` 里都有完整定义，但默认模式（FULL）只读这里的 4 个分类，
+     * 所以模型既看不见也用不了 —— 更糟的是 `write_file` 的报错文案还在让模型去调它。
+     *
+     * 做法：不重写定义，**直接复用内部那几段**，按名字挑出来单列一个分类。
+     * 注意：这几个名字不能出现在其它公开分类里，否则模型会看到两份同名定义。
+     */
+    private val agentToolNames =
+        setOf("write_file", "ask_user", "spawn_subagent", "job_output", "job_kill")
+
+    private fun agentToolsFrom(source: List<SystemToolPromptCategory>, cn: Boolean) =
+        SystemToolPromptCategory(
+            categoryName = if (cn) "代理工具" else "Agent tools",
+            tools = source.flatMap { it.tools }.filter { it.name in agentToolNames }
+        )
+
     // ==================== 基础工具 ====================
     val basicTools = SystemToolPromptCategory(
         categoryName = "Available tools",
@@ -540,7 +560,8 @@ object SystemToolPrompts {
             basicTools,
             adjustedFileSystemTools,
             httpTools,
-            memoryTools
+            memoryTools,
+            agentToolsFrom(SystemToolPromptsInternal.internalToolCategoriesEn, cn = false)
         )
     }
 
@@ -615,7 +636,8 @@ object SystemToolPrompts {
             basicToolsCn,
             adjustedFileSystemTools,
             httpToolsCn,
-            memoryToolsCn
+            memoryToolsCn,
+            agentToolsFrom(SystemToolPromptsInternal.internalToolCategoriesCn, cn = true)
         )
     }
 
@@ -680,10 +702,18 @@ object SystemToolPrompts {
         useEnglish: Boolean,
         toolOrder: List<String> = emptyList()
     ): List<ManageableToolPrompt> {
+        // 注意：这里必须和上面的下发分类保持一致。漏了新分类时，
+        // 角色卡一开"自定义工具权限"，新工具会被静默过滤成 false（配了也看不见）。
         val baseCategories = if (useEnglish) {
-            listOf(basicTools, fileSystemTools, httpTools, memoryTools)
+            listOf(
+                basicTools, fileSystemTools, httpTools, memoryTools,
+                agentToolsFrom(SystemToolPromptsInternal.internalToolCategoriesEn, cn = false)
+            )
         } else {
-            listOf(basicToolsCn, fileSystemToolsCn, httpToolsCn, memoryToolsCn)
+            listOf(
+                basicToolsCn, fileSystemToolsCn, httpToolsCn, memoryToolsCn,
+                agentToolsFrom(SystemToolPromptsInternal.internalToolCategoriesCn, cn = true)
+            )
         }
 
         val result = baseCategories
