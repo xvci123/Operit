@@ -4,17 +4,17 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Dump nodejs-mobile-cordova java glue contract
+      - name: Dump shim + cmake + any prebuilt native lib
         run: |
           set -e
           URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-cordova/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['dist']['tarball'])")
           curl -sL "$URL" -o /tmp/n.tgz
-          echo "=== src/android 目录 ==="
-          tar -tzf /tmp/n.tgz | grep "src/android" | head -20
           mkdir -p /tmp/u && tar -xzf /tmp/n.tgz -C /tmp/u
-          echo "=== NodeJS.java 里的公开方法 ==="
-          find /tmp/u -name "NodeJS.java" -exec grep -nE "public (static )?[A-Za-z<>\[\]]+ [a-zA-Z]+\(" {} \; | head -30
-          echo "=== 原生方法声明 ==="
-          find /tmp/u -name "NodeJS.java" -exec grep -nE "native|System.loadLibrary" {} \; | head -20
-          echo "=== 插件清单里 libnode 版本 ==="
-          find /tmp/u -name "package.json" -path "*cordova*" -exec head -6 {} \;
+          echo "=== 全部 .so（含 shim?） ==="
+          tar -tzf /tmp/n.tgz | grep -i "\.so" | head -20
+          echo "=== CMakeLists.txt 全文 ==="
+          cat /tmp/u/package/src/android/CMakeLists.txt
+          echo "=== native-lib.cpp 头 60 行 ==="
+          head -60 /tmp/u/package/src/android/jni/native-lib.cpp
+          echo "=== node 头文件目录 ==="
+          ls /tmp/u/package/libs/android/libnode/include/node | head -8
