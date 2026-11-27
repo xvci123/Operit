@@ -875,10 +875,12 @@ tasks.configureEach {
 
 
 // ===== Hermes: 取回 Node 引擎与胶水源码，摆成它 CMake 期望的结构 =====
+// 实测（构建日志里的真实文件树）：包里只有 src/android/jni/native-lib.cpp 这一个 cpp，
+// 它自己 CMakeLists 里引用的 cordova-bridge.cpp 并不存在——所以下面把那一行删掉。
 val hermesNodeWork = layout.buildDirectory.dir("hermes-node")
 
 val hermesFetchLibnode by tasks.registering {
-    description = "下载 nodejs-mobile-cordova，摆出 cpp 源码 + libnode 目录（arm64）"
+    description = "下载 nodejs-mobile-cordova，摆出 native-lib.cpp 与 libnode（arm64）"
     doLast {
         val work = hermesNodeWork.get().asFile
         work.mkdirs()
@@ -893,30 +895,13 @@ val hermesFetchLibnode by tasks.registering {
         unpacked.mkdirs()
         project.exec { commandLine("tar", "-xzf", tgz.absolutePath, "-C", unpacked.absolutePath) }
         val pkg = File(unpacked, "package")
+
         val cppDst = File(projectDir, "src/main/cpp/hermes")
         cppDst.mkdirs()
-        val cppNames = cppDst.listFiles()?.filter { it.extension == "cpp" }?.map { it.name }.orEmpty()
-        println("### HERMES: cpp files = " + cppNames.joinToString(","))
-        if (cppNames.isEmpty()) {
-            val tree = File(pkg, "src/android").walkTopDown().filter { it.isFile }.map { it.path.replace(pkg.path + "/", "") }.take(40).toList()
-            error("### HERMES: no cpp found. tree=" + tree.joinToString(" | "))
-        }
-        var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
-            .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
-        // 它引用的文件名未必都在包里：按实际存在的 cpp 修，缺哪个就把那行换掉/删掉
-        listOf("native-lib.cpp", "cordova-bridge.cpp").forEach { referenced ->
-            if (referenced !in cppNames) {
-                val alt = cppNames.firstOrNull { it != "native-lib.cpp" }
-                theirCmake =
-                    if (alt != null) theirCmake.replace(referenced, alt)
-                    else theirCmake.replace(Regex("""\n\s*""" + Regex.escape(referenced)), "")
-            }
-        }
-        File(cppDst, "CMakeLists.txt").writeText(theirCmake)
-        // 整个 src/android 下所有 cpp/h 平铺到 hermes/（cordova-bridge.cpp 不在 jni/ 里）
-        File(pkg, "src/android").walkTopDown()
-            .filter { it.isFile && (it.extension in setOf("cpp", "cc", "h", "hpp", "c")) }
-            .forEach { it.copyTo(File(cppDst, it.name), overwrite = true) }
+        val nativeCpp = File(pkg, "src/android/jni/native-lib.cpp")
+        if (!nativeCpp.exists()) error("### HERMES: native-lib.cpp not found: ${nativeCpp.absolutePath}")
+        nativeCpp.copyTo(File(cppDst, "native-lib.cpp"), overwrite = true)
+
         val libSrc = File(pkg, "libs/android/libnode")
         val libDst = File(cppDst, "libnode")
         libSrc.copyRecursively(libDst, overwrite = true)
@@ -928,7 +913,14 @@ val hermesFetchLibnode by tasks.registering {
         listOf("armeabi-v7a", "x86", "x86_64").forEach { abi ->
             File(libDst, "bin/$abi").deleteRecursively()
         }
-        println("### HERMES: node sources ready; libnode.so ${outSo.length() / 1048576} MB")
+
+        var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
+            .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
+        theirCmake = theirCmake.replace(Regex("""(?m)^\s*cordova-bridge\.cpp\s*$\n?"""), "")
+        File(cppDst, "CMakeLists.txt").writeText(theirCmake)
+
+        println("### HERMES: node sources ready; libnode.so ${outSo.length() / 1048576} MB; "
+                + "sources=native-lib.cpp only (cordova-bridge.cpp absent in package)")
     }
 }
 
