@@ -187,3 +187,8 @@ enable_16kb_page_alignment(streamnative)
 if(ANDROID)
     enable_16kb_page_alignment(toolpkgwasm)
 endif()
+
+# ==== Hermes: 把 Node 引擎的胶水挂进来（目录由构建时下载生成，缺了就跳过）====
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/hermes/CMakeLists.txt)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/hermes/CMakeLists.txt)
+endif()

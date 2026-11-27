@@ -874,40 +874,46 @@ tasks.configureEach {
 }
 
 
-// ===== Hermes: 把预编译的 Node for Android（libnode.so）取进来 =====
-// 来源：npm 上的 nodejs-mobile-cordova（包里带 arm64-v8a/libnode.so.gz 与头文件）。
-// 只在构建机上联网拉一次，落到源码树 jniLibs，再由 AGP 打进 APK。
+// ===== Hermes: 取回 Node 引擎与胶水源码，摆成它 CMake 期望的结构 =====
 val hermesNodeWork = layout.buildDirectory.dir("hermes-node")
 
 val hermesFetchLibnode by tasks.registering {
-    description = "下载 nodejs-mobile-cordova 并解出 arm64-v8a/libnode.so"
+    description = "下载 nodejs-mobile-cordova，摆出 cpp 源码 + libnode 目录（arm64）"
     doLast {
         val work = hermesNodeWork.get().asFile
         work.mkdirs()
         val tgz = File(work, "nodejs-mobile-cordova.tgz")
         if (!tgz.exists() || tgz.length() < 1_000_000L) {
-            val url =
-                "https://registry.npmjs.org/nodejs-mobile-cordova/-/nodejs-mobile-cordova-0.4.3.tgz"
-            println("### HERMES: downloading libnode from $url")
-            URI(url).toURL().openStream().use { input ->
-                tgz.outputStream().use { out -> input.copyTo(out) }
-            }
+            val url = "https://registry.npmjs.org/nodejs-mobile-cordova/-/nodejs-mobile-cordova-0.4.3.tgz"
+            println("### HERMES: downloading $url")
+            URI(url).toURL().openStream().use { i -> tgz.outputStream().use { o -> i.copyTo(o) } }
         }
         val unpacked = File(work, "unpacked")
-        if (!unpacked.exists()) unpacked.mkdirs()
         if (!File(unpacked, "package").exists()) {
+            unpacked.mkdirs()
             project.exec { commandLine("tar", "-xzf", tgz.absolutePath, "-C", unpacked.absolutePath) }
         }
-        val libRoot = File(unpacked, "package/libs/android/libnode")
-        val gz = File(libRoot, "bin/arm64-v8a/libnode.so.gz")
-        if (!gz.exists()) error("### HERMES: libnode.so.gz not found: ${gz.absolutePath}")
-        val outDir = File(projectDir, "src/main/jniLibs/arm64-v8a")
-        outDir.mkdirs()
-        val outSo = File(outDir, "libnode.so")
-        GZIPInputStream(gz.inputStream()).use { input ->
-            outSo.outputStream().use { out -> input.copyTo(out) }
+        val pkg = File(unpacked, "package")
+        val cppDst = File(projectDir, "src/main/cpp/hermes")
+        cppDst.mkdirs()
+        val theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
+            .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
+        File(cppDst, "CMakeLists.txt").writeText(theirCmake)
+        File(pkg, "src/android/jni").listFiles()?.filter { it.isFile }?.forEach {
+            it.copyTo(File(cppDst, it.name), overwrite = true)
         }
-        println("### HERMES: libnode.so ready ${outSo.length() / 1048576} MB -> ${outSo.absolutePath}")
+        val libSrc = File(pkg, "libs/android/libnode")
+        val libDst = File(cppDst, "libnode")
+        libSrc.copyRecursively(libDst, overwrite = true)
+        val gz = File(libDst, "bin/arm64-v8a/libnode.so.gz")
+        if (!gz.exists()) error("### HERMES: libnode.so.gz not found: ${gz.absolutePath}")
+        val outSo = File(libDst, "bin/arm64-v8a/libnode.so")
+        GZIPInputStream(gz.inputStream()).use { i -> outSo.outputStream().use { o -> i.copyTo(o) } }
+        gz.delete()
+        listOf("armeabi-v7a", "x86", "x86_64").forEach { abi ->
+            File(libDst, "bin/$abi").deleteRecursively()
+        }
+        println("### HERMES: node sources ready; libnode.so ${outSo.length() / 1048576} MB")
     }
 }
 
