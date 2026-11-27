@@ -89,6 +89,15 @@ class MainActivity : ComponentActivity() {
     private var hermesOnboardingFinished by mutableStateOf(false)
     /** Hermes：鲸鱼已落到左上角图标位置 —— 这时才开始组合 App 树，做 300ms 交接。 */
     private var hermesSplashLanded by mutableStateOf(false)
+    /**
+     * Hermes：进入"加载阶段"就开始组合主界面。
+     *
+     * 以前要等鲸鱼落地（2850ms）才组合，结果"加载"这件事发生在启动层退底色之后，
+     * 露出的就是还没画完的主界面 —— 真机看到的是黑屏/发暗。
+     * 现在改成：文字退完（2180ms）就开始组合，启动层用不透明底色压住它，
+     * 等它真正画出来（onPlaced）鲸鱼才起飞。
+     */
+    private var hermesComposeApp by mutableStateOf(false)
     /** Hermes：App 树已经摆上屏幕（onPlaced）。启动层等它出了第一帧才退底色。 */
     private var hermesAppDrawn by mutableStateOf(false)
 
@@ -670,11 +679,12 @@ class MainActivity : ComponentActivity() {
             // 正常时序（3.4s 完成）下这两条都不会触发。
             LaunchedEffect(Unit) {
                 delay(6000)
+                hermesComposeApp = true
                 if (!hermesSplashLanded) hermesSplashLanded = true
                 delay(3000)
                 if (!hermesSplashDone) hermesSplashDone = true
             }
-            if (hermesSplashLanded || hermesSplashDone) {
+            if (hermesComposeApp || hermesSplashLanded || hermesSplashDone) {
             OperitTheme {
                 Box(modifier = Modifier.onPlaced { hermesAppDrawn = true }) {
                     // 检查是否需要显示用户协议
@@ -793,6 +803,7 @@ class MainActivity : ComponentActivity() {
                         flyToHeader = hermesOnboardingFinished,
                         hold = !hermesBootReady,
                         appReady = hermesAppDrawn,
+                        onLoading = { hermesComposeApp = true },
                         onLanded = { hermesSplashLanded = true },
                         onFinished = { hermesSplashDone = true }
                 )

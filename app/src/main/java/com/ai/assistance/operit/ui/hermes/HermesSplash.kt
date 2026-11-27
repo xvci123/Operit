@@ -15,12 +15,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.LinearGradientShader
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -85,6 +87,7 @@ fun HermesSplash(
     flyToHeader: Boolean,
     hold: Boolean = false,
     appReady: Boolean = true,
+    onLoading: () -> Unit = {},
     onLanded: () -> Unit = {},
     onFinished: () -> Unit
 ) {
@@ -99,6 +102,7 @@ fun HermesSplash(
 
     val holdState = rememberUpdatedState(hold)
     val readyState = rememberUpdatedState(appReady)
+    val loadingCallback = rememberUpdatedState(onLoading)
     val landedCallback = rememberUpdatedState(onLanded)
     val finishedCallback = rememberUpdatedState(onFinished)
 
@@ -109,6 +113,7 @@ fun HermesSplash(
         var virtual = hermesSplashConsumedMs.coerceIn(0f, TOTAL_MS)
         var lastWall = SystemClock.elapsedRealtime()
         var landed = false
+        var loadingNotified = false
         var waitedForApp = 0f
         var lastPhase = -1
         Log.i("HermesSplash", "start resumeAt=${virtual.toInt()}ms hold=${holdState.value}")
@@ -123,9 +128,10 @@ fun HermesSplash(
             // hold：冻结在"光已扫完、字已淡出、鲸鱼完整但还没起飞"
             if (holdState.value) next = minOf(next, HOLD_AT_MS)
             // 已落地但 App 还没出第一帧：停在图标位置等，最多 1.2s
-            if (next >= FLY_END_MS && !readyState.value && waitedForApp < APP_WAIT_CAP_MS) {
+            // 加载阶段：文字退完后停在 LAODING 点，等主界面画出来（最多 8 秒）才起飞
+            if (next >= LOADING_AT_MS && !readyState.value && waitedForApp < APP_WAIT_CAP_MS) {
                 waitedForApp += dt
-                next = minOf(next, FLY_END_MS)
+                next = minOf(next, LOADING_AT_MS)
             }
             virtual = next
             hermesSplashConsumedMs = virtual
@@ -147,6 +153,10 @@ fun HermesSplash(
                 )
             }
 
+            if (!loadingNotified && virtual >= LOADING_AT_MS) {
+                loadingNotified = true
+                loadingCallback.value()   // 主界面开始组合，加载环同时转起来
+            }
             if (!landed && virtual >= FLY_END_MS) {
                 landed = true
                 landedCallback.value()
@@ -195,6 +205,25 @@ fun HermesSplash(
             )
         }
 
+        // ---- 3.5 加载环：鲸鱼停在中间等主界面时，下方转一个圈 ----
+        if (now >= LOADING_AT_MS && !readyState.value) {
+            val ring = 13.dp.toPx()
+            val ringCx = w / 2f
+            val ringCy = startCy + startSize / 2f + 30.dp.toPx()
+            val spin = (now / 900f) * 360f
+            withTransform({ rotate(degrees = spin, pivot = Offset(ringCx, ringCy)) }) {
+                drawArc(
+                    color = Color.White.copy(alpha = 0.72f),
+                    startAngle = 0f,
+                    sweepAngle = 110f,
+                    useCenter = false,
+                    topLeft = Offset(ringCx - ring, ringCy - ring),
+                    size = Size(ring * 2f, ring * 2f),
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+                )
+            }
+        }
+
         // ---- 4. 鲸鱼：显影 → 完整 → 飞行 ----
         if (now >= WHALE_IN_MS) {
             val fly = hermesEaseInOut(hermesRamp(now, FLY_START_MS, FLY_END_MS))
@@ -231,7 +260,7 @@ fun HermesSplash(
         if (sweepRaw > 0f && sweepRaw < 1f) {
             val env = minOf(1f, sweepRaw / 0.10f, (1f - sweepRaw) / 0.10f)
             if (env > 0.004f) {
-                val bandWidth = w * 0.30f
+                val bandWidth = w * 0.45f
                 val travel = front - centerProj
                 val halfBand = bandWidth / 2f
                 // 显式 LinearGradientShader：渐变坐标就在旋转后的局部坐标系里，
@@ -252,7 +281,7 @@ fun HermesSplash(
                                         Color(0xFF8EBCFF).copy(alpha = 0.13f * env),
                                         Color.Transparent
                                     ),
-                                colorStops = listOf(0f, 0.36f, 0.487f, 0.50f, 0.513f, 0.64f, 1f),
+                                colorStops = listOf(0f, 0.28f, 0.42f, 0.50f, 0.58f, 0.72f, 1f),
                                 tileMode = TileMode.Clamp
                             )
                     }
@@ -383,7 +412,7 @@ private fun DrawScope.drawWordmark(
                     alpha = a,
                     color = if (wordB) Color.White else WORD_SOLID_OUT,
                     // HARNESS 镂空：只描边不填充
-                    drawStyle = if (wordB) Stroke(width = 1.6.dp.toPx()) else null
+                    drawStyle = null
                 )
             }
         }
@@ -440,7 +469,7 @@ private val WORD_B = "HARNESS"
 
 private const val WHALE_IN_MS = 120f
 private const val BEAM_START_MS = 520f
-private const val BEAM_END_MS = 1900f
+private const val BEAM_END_MS = 2020f
 
 private const val WORD_A_IN_MS = 560f
 private const val WORD_A_STAGGER_MS = 62f
@@ -448,16 +477,19 @@ private const val WORD_A_OUT_MS = 1250f
 private const val WORD_B_IN_MS = 1400f
 private const val WORD_B_STAGGER_MS = 46f
 private const val WORD_FLIP_MS = 170f
-private const val WORD_OUT_START_MS = 1950f
-private const val WORD_OUT_END_MS = 2130f
+private const val WORD_OUT_START_MS = 2000f
+private const val WORD_OUT_END_MS = 2180f
 
-private const val FLY_START_MS = 2150f
-private const val FLY_END_MS = 2900f
+private const val FLY_START_MS = 2250f
+private const val FLY_END_MS = 2950f
 /** 落地后停在图标上 0.5 秒再交接：这是"鲸鱼变成图标"被看见的唯一窗口。 */
-private const val TOTAL_MS = 3400f
+private const val TOTAL_MS = 3300f
 
 /** hold 时冻结的时刻：光已扫完、字已淡出、鲸鱼完整，尚未起飞。 */
-private const val HOLD_AT_MS = 2080f
+private const val HOLD_AT_MS = 2200f
+
+/** 进入"加载阶段"的时刻：文字退完、鲸鱼停在中间等主界面。 */
+private const val LOADING_AT_MS = 2180f
 
 /** 等 App 画出第一帧的上限，超时就照常交接。 */
-private const val APP_WAIT_CAP_MS = 1200L
+private const val APP_WAIT_CAP_MS = 8000L
