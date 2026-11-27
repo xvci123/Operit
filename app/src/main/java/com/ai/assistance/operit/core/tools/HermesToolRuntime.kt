@@ -23,7 +23,14 @@ object HermesToolRuntime {
         val maxResultChars: Int = DEFAULT_MAX_RESULT_CHARS
     )
 
-    const val DEFAULT_MAX_RESULT_CHARS = 48_000
+    /**
+     * 进模型的结果长度上限。
+     *
+     * **D-10（2026-11-26 用户决定）：默认不截断**，原值 48_000。
+     * 与"命令不限时、工具轮次不设上限"同一条原则：不给能力设隐藏上限。
+     * 需要恢复旧行为时把这个值改回 48_000 即可，截断与 spill 的代码都还在。
+     */
+    const val DEFAULT_MAX_RESULT_CHARS = Int.MAX_VALUE
     private const val HEAD_CHARS = 28_000
     private const val TAIL_CHARS = 16_000
 
