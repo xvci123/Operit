@@ -4,16 +4,20 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Check prebuilt Node for Android is reachable from CI
+      - name: Inspect nodejs-mobile-cordova npm tarball
         run: |
           set -x
-          for v in v18.20.4 v16.20.2 v22.9.0; do
-            U="https://github.com/JaneaSystems/nodejs-mobile/releases/download/nodejs-mobile-${v}/nodejs-mobile-${v}-android.zip"
-            CODE=$(curl -sIL -o /dev/null -w "%{http_code}" "$U")
-            LEN=$(curl -sIL "$U" | tr -d '\r' | awk 'tolower($1)=="content-length:"{v=$2} END{print v}')
-            echo "RELEASE $v http=$CODE bytes=$LEN"
-          done
-          echo "--- npm registry ---"
-          curl -s https://registry.npmjs.org/nodejs-mobile-cordova | head -c 300
-          echo
-          curl -s "https://registry.npmjs.org/nodejs-mobile-react-native/latest" | head -c 300
+          URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-cordova/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['dist']['tarball'])")
+          echo "TARBALL=$URL"
+          curl -sL "$URL" -o /tmp/n.tgz
+          ls -l /tmp/n.tgz
+          tar -tzf /tmp/n.tgz | grep -E "libnode|\.so$|include/node/node\.h" | head -20
+          echo "--- 总文件数 ---"
+          tar -tzf /tmp/n.tgz | wc -l
+      - name: Inspect nodejs-mobile-react-native npm tarball
+        run: |
+          set -x
+          URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-react-native/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['dist']['tarball'])")
+          curl -sL "$URL" -o /tmp/m.tgz
+          ls -l /tmp/m.tgz
+          tar -tzf /tmp/m.tgz | grep -E "libnode|\.so$|\.aar$" | head -20
