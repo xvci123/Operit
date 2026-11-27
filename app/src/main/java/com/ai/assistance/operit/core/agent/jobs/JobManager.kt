@@ -542,10 +542,8 @@ object JobManager {
             val remain = total - to
             val incrementalHeader =
                     buildString {
-                        append("作业 ").append(record.id).append('
-')
-                        append("状态：").append(statusLabel(record)).append('
-')
+                        append("作业 ").append(record.id).append('\n')
+                        append("状态：").append(statusLabel(record)).append('\n')
                         if (total == 0) {
                             append("输出：（暂无输出）\n")
                         } else {
