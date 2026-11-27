@@ -98,6 +98,14 @@ class MainActivity : ComponentActivity() {
      * 等它真正画出来（onPlaced）鲸鱼才起飞。
      */
     private var hermesComposeApp by mutableStateOf(false)
+    /**
+     * Hermes：组件初始化完成（`toolHandler` 等已赋值）。
+     *
+     * 主界面必须等它：`OperitApp` 组合时会读 `toolHandler`，提前组合会抛
+     * `lateinit property toolHandler has not been initialized`
+     * （真机"过完引导再进入"时必现）。
+     */
+    private var hermesComponentsReady by mutableStateOf(false)
     /** Hermes：App 树已经摆上屏幕（onPlaced）。启动层等它出了第一帧才退底色。 */
     private var hermesAppDrawn by mutableStateOf(false)
 
@@ -247,6 +255,7 @@ class MainActivity : ComponentActivity() {
 
             try {
                 initializeComponents()
+                hermesComponentsReady = true   // 之后才允许组合主界面
                 anrMonitor.start()
                 configureDisplaySettings()
 
@@ -684,7 +693,7 @@ class MainActivity : ComponentActivity() {
                 delay(3000)
                 if (!hermesSplashDone) hermesSplashDone = true
             }
-            if (hermesComposeApp || hermesSplashLanded || hermesSplashDone) {
+            if (hermesComponentsReady || hermesSplashLanded || hermesSplashDone) {
             OperitTheme {
                 Box(modifier = Modifier.onPlaced { hermesAppDrawn = true }) {
                     // 检查是否需要显示用户协议
@@ -738,7 +747,7 @@ class MainActivity : ComponentActivity() {
 
                             CompositionLocalProvider(LocalPluginLoadingState provides pluginLoadingState) {
                                 // 主应用界面 (始终存在于底层)
-                                OperitApp(
+                                if (this@MainActivity::toolHandler.isInitialized) OperitApp(
                                         initialNavItem = initialNavItem,
                                         toolHandler = toolHandler,
                                         shortcutNavRequest = shortcutNavItem,

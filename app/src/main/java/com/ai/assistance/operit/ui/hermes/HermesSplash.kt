@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ai.assistance.operit.R
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -119,7 +121,9 @@ fun HermesSplash(
         Log.i("HermesSplash", "start resumeAt=${virtual.toInt()}ms hold=${holdState.value}")
 
         while (true) {
-            delay(16)
+            // 帧同步：有帧就跟帧（60/120Hz 都贴合），没有帧就靠超时兜底继续推进 ——
+            // 既拿到丝滑的光带，又保留"帧时钟不推也不会卡死"的安全性。
+            withTimeoutOrNull(34L) { withFrameNanos { } }
             val wall = SystemClock.elapsedRealtime()
             val dt = (wall - lastWall).coerceIn(0L, 64L).toFloat()
             lastWall = wall
