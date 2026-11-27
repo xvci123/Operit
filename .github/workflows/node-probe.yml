@@ -4,17 +4,16 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Dump shim + cmake + any prebuilt native lib
+      - name: Find complete bridge sources
         run: |
-          set -e
-          URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-cordova/latest | python3 -c "import json,sys; print(json.load(sys.stdin)['dist']['tarball'])")
-          curl -sL "$URL" -o /tmp/n.tgz
-          mkdir -p /tmp/u && tar -xzf /tmp/n.tgz -C /tmp/u
-          echo "=== 全部 .so（含 shim?） ==="
-          tar -tzf /tmp/n.tgz | grep -i "\.so" | head -20
-          echo "=== CMakeLists.txt 全文 ==="
-          cat /tmp/u/package/src/android/CMakeLists.txt
-          echo "=== native-lib.cpp 头 60 行 ==="
-          head -60 /tmp/u/package/src/android/jni/native-lib.cpp
-          echo "=== node 头文件目录 ==="
-          ls /tmp/u/package/libs/android/libnode/include/node | head -8
+          set -x
+          echo "=== 候选 raw 地址逐个试 ==="
+          for U in \
+            "https://raw.githubusercontent.com/JaneaSystems/nodejs-mobile-cordova/main/src/android/jni/cordova-bridge.h" \
+            "https://raw.githubusercontent.com/nodejs-mobile/nodejs-mobile-cordova/master/src/android/jni/cordova-bridge.h" \
+            "https://raw.githubusercontent.com/nodejs-mobile/nodejs-mobile-react-native/master/android/src/main/java/com/janeasystems/rn_nodejs_mobile/RNNodeJsMobileModule.java" ; do
+            echo "$(curl -sIL -o /dev/null -w '%{http_code}' "$U")  $U"
+          done
+          echo "=== react-native 包里有什么 ==="
+          URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-react-native/latest | python3 -c "import json,sys;print(json.load(sys.stdin)['dist']['tarball'])")
+          curl -sL "$URL" -o /tmp/m.tgz; tar -tzf /tmp/m.tgz | grep -Ei "\.aar$|\.so$|\.jar$|libnode|jni" | head -25
