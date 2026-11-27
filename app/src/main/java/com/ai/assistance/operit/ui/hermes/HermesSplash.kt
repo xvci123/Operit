@@ -291,26 +291,30 @@ fun HermesSplash(
                 val halfBand = bandWidth / 2f
                 // 显式 LinearGradientShader：渐变坐标就在旋转后的局部坐标系里，
                 // 和下面画的矩形严丝合缝，不依赖 Brush 对默认边界的推断。
-                val beamPaint =
-                    Paint().apply {
-                        shader =
-                            LinearGradientShader(
-                                from = Offset(-halfBand, 0f),
-                                to = Offset(halfBand, 0f),
-                                colors =
-                                    listOf(
-                                        Color.Transparent,
-                                        Color(0xFF8EBCFF).copy(alpha = 0.13f * env),
-                                        Color.White.copy(alpha = 0.46f * env),
-                                        Color.White.copy(alpha = 0.72f * env),
-                                        Color.White.copy(alpha = 0.46f * env),
-                                        Color(0xFF8EBCFF).copy(alpha = 0.13f * env),
-                                        Color.Transparent
-                                    ),
-                                colorStops = listOf(0f, 0.28f, 0.42f, 0.50f, 0.58f, 0.72f, 1f),
-                                tileMode = TileMode.Clamp
-                            )
-                    }
+                if (beamPaintCache.width != w || beamPaintCache.paint == null) {
+                    beamPaintCache.paint =
+                        Paint().apply {
+                            shader =
+                                LinearGradientShader(
+                                    from = Offset(-halfBand, 0f),
+                                    to = Offset(halfBand, 0f),
+                                    colors =
+                                        listOf(
+                                            Color.Transparent,
+                                            Color(0xFF8EBCFF).copy(alpha = 0.13f),
+                                            Color.White.copy(alpha = 0.46f),
+                                            Color.White.copy(alpha = 0.72f),
+                                            Color.White.copy(alpha = 0.46f),
+                                            Color(0xFF8EBCFF).copy(alpha = 0.13f),
+                                            Color.Transparent
+                                        ),
+                                    colorStops = listOf(0f, 0.28f, 0.42f, 0.50f, 0.58f, 0.72f, 1f),
+                                    tileMode = TileMode.Clamp
+                                )
+                        }
+                    beamPaintCache.width = w
+                }
+                val beamPaint = beamPaintCache.paint!!.apply { alpha = env }
                 // rotate(+45°) 让局部 +x 指向屏幕右下：光带于是从左上角扫向右下角。
                 withTransform({
                     rotate(degrees = 45f, pivot = center)
@@ -483,6 +487,20 @@ private fun hermesBeamCurve(x: Float): Float {
  * 所以起点是第一帧，靠这个变量保证"重新 setContent 只接着播、不重播"。
  */
 private var hermesSplashConsumedMs = 0f
+
+/**
+ * 光带渐变的缓存。
+ *
+ * 原来每帧都 `Paint()` + `LinearGradientShader(...)` 新建一次 —— 120Hz 屏上每秒 120 个对象，
+ * GC 抖动就是"动画偶尔卡一下"的来源。这里按宽度缓存：宽度不变就复用，
+ * 强弱改由 `paint.alpha = env` 表达（视觉等价，峰值仍是 0.72×env）。
+ */
+private class BeamPaintCache {
+    var width: Float = -1f
+    var paint: Paint? = null
+}
+
+private val beamPaintCache = BeamPaintCache()
 
 /** 光带方向：屏幕坐标下 45° 指向右下。 */
 private const val BEAM_UX = 0.70710678f
