@@ -1,3 +1,6 @@
+import java.net.URI
+import java.util.zip.GZIPInputStream
+
 import java.io.File
 import java.io.FileInputStream
 import java.net.HttpURLConnection
@@ -888,7 +891,7 @@ val hermesFetchLibnode by tasks.registering {
             val url =
                 "https://registry.npmjs.org/nodejs-mobile-cordova/-/nodejs-mobile-cordova-0.4.3.tgz"
             println("### HERMES: downloading libnode from $url")
-            java.net.URI(url).toURL().openStream().use { input ->
+            URI(url).toURL().openStream().use { input ->
                 tgz.outputStream().use { out -> input.copyTo(out) }
             }
         }
@@ -903,7 +906,7 @@ val hermesFetchLibnode by tasks.registering {
         val outDir = File(projectDir, "src/main/jniLibs/arm64-v8a")
         outDir.mkdirs()
         val outSo = File(outDir, "libnode.so")
-        java.util.zip.GZIPInputStream(gz.inputStream()).use { input ->
+        GZIPInputStream(gz.inputStream()).use { input ->
             outSo.outputStream().use { out -> input.copyTo(out) }
         }
         println("### HERMES: libnode.so ready ${outSo.length() / 1048576} MB -> ${outSo.absolutePath}")
