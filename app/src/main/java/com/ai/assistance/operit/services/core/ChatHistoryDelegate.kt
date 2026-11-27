@@ -40,6 +40,9 @@ class ChatHistoryDelegate(
         private val onScrollToBottom: () -> Unit = {} // 滚动到底部事件回调
 ) {
     companion object {
+        /** 压缩后原样保留的最近消息占比（对齐 DSHA 的 retainRatio）。 */
+        private const val RETAIN_RATIO = 0.16f
+
         private const val TAG = "ChatHistoryDelegate"
         private const val DISPLAY_WINDOW_QUERY_BATCH_SIZE = 80
         // This constant is now in AIMessageManager
@@ -1673,14 +1676,27 @@ class ChatHistoryDelegate(
      * 即最后一条AI消息之后。
      */
     fun findProperSummaryPosition(messages: List<ChatMessage>): Int {
-        // 从后往前找，找到最近的一条AI消息的索引。
+        // 从后往前找，找到最近的一条 AI 消息的索引。
         val lastAiMessageIndex = messages.indexOfLast { it.sender == "ai" }
 
-        // 摘要应该被放置在最后一条AI消息之后，这标志着一个完整对话轮次的结束。
-        // 如果没有找到AI消息（例如，在聊天的开始），lastAiMessageIndex将是-1，
-        // 我们将在索引0处插入，这是正确的行为。
-        return lastAiMessageIndex + 1
+        // 摘要的落点必须在"一个完整对话轮次结束之后"（没有 AI 消息时放 0）。
+        val end = if (lastAiMessageIndex < 0) 0 else lastAiMessageIndex + 1
+        if (end <= 0) return 0
+
+        // 按 DSHA 的保留比例：最近约 16% 的消息**原样保留**，摘要插在它们之前。
+        // 以前固定返回 end（= 最后一条 AI 之后）⇒ 保留量≈0，压缩完只剩摘要，
+        // 用户感知就是"聊完就失忆"。这里至少保留 2 条，避免刚开始就压空。
+        val retainCount = maxOf(2, (end * RETAIN_RATIO).toInt())
+        val target = end - retainCount
+        if (target <= 0) return end
+
+        // 切点也对齐到轮次边界：往前找最近的"AI 消息之后"，保证不会把一个回合劈成两半。
+        for (i in target downTo 1) {
+            if (messages[i - 1].sender == "ai") return i
+        }
+        return end
     }
+
 
     /** 切换是否显示聊天历史选择器 */
     fun toggleChatHistorySelector() {
