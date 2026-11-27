@@ -1,10 +1,8 @@
-import java.net.URI
-import java.util.zip.GZIPInputStream
-
 import java.io.File
 import java.io.FileInputStream
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.zip.GZIPInputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
