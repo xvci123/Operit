@@ -95,11 +95,20 @@ fun HermesSplash(
 ) {
     val context = LocalContext.current
     val clock = remember { mutableFloatStateOf(0f) }
+    // 转圈用的自旋时钟：加载阶段虚拟时间被冻住，但圈必须一直在转
+    val spin = remember { mutableFloatStateOf(0f) }
     val whale =
         remember {
             BitmapFactory.decodeResource(context.resources, R.drawable.whale_alpha).asImageBitmap()
         }
     val measurer = rememberTextMeasurer()
+    val loadLabel =
+        remember(measurer) {
+            measurer.measure(
+                "正在加载…",
+                TextStyle(fontSize = 12.sp, color = Color.White.copy(alpha = 0.55f))
+            )
+        }
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     val holdState = rememberUpdatedState(hold)
@@ -140,6 +149,7 @@ fun HermesSplash(
             virtual = next
             hermesSplashConsumedMs = virtual
             clock.floatValue = virtual
+            spin.floatValue = (wall % 900L) / 900f * 360f
 
             val phase =
                 when {
@@ -213,9 +223,10 @@ fun HermesSplash(
         if (now >= LOADING_AT_MS && !readyState.value) {
             val ring = 13.dp.toPx()
             val ringCx = w / 2f
-            val ringCy = startCy + startSize / 2f + 30.dp.toPx()
-            val spin = (now / 900f) * 360f
-            withTransform({ rotate(degrees = spin, pivot = Offset(ringCx, ringCy)) }) {
+            val settleR = hermesEaseInOut(hermesRamp(now, LOADING_AT_MS, FLY_START_MS))
+            val ringCy = (startCy + (h / 2f - 6.dp.toPx() - startCy) * settleR) + startSize / 2f + 22.dp.toPx()
+            val angle = spin.floatValue
+            withTransform({ rotate(degrees = angle, pivot = Offset(ringCx, ringCy)) }) {
                 drawArc(
                     color = Color.White.copy(alpha = 0.72f),
                     startAngle = 0f,
@@ -226,6 +237,12 @@ fun HermesSplash(
                     style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
+            // 文案在圈下面，水平居中
+            val labelTop = ringCy + ring + 10.dp.toPx()
+            drawText(
+                textLayoutResult = loadLabel,
+                topLeft = Offset(w / 2f - loadLabel.size.width / 2f, labelTop)
+            )
         }
 
         // ---- 4. 鲸鱼：显影 → 完整 → 飞行 ----
@@ -233,7 +250,12 @@ fun HermesSplash(
             val fly = hermesEaseInOut(hermesRamp(now, FLY_START_MS, FLY_END_MS))
             val whaleSize = startSize + (endSize - startSize) * fly
             val cx = startCx + (endCx - startCx) * fly
-            val cy = startCy + (endCy - startCy) * fly
+            // 文字退场后，鲸鱼平滑落到视觉正中（LOADING_AT→起飞前），
+            // 起飞从这个落定位置开始 —— 全程连续，不会先"往上飘一下"再飞。
+            val settle = hermesEaseInOut(hermesRamp(now, LOADING_AT_MS, FLY_START_MS))
+            val loadingCy = h / 2f - 6.dp.toPx()
+            val launchCy = startCy + (loadingCy - startCy) * settle
+            val cy = launchCy + (endCy - launchCy) * fly
             val left = cx - whaleSize / 2f
             val top = cy - whaleSize / 2f
             val appear = hermesRamp(now, WHALE_IN_MS, WHALE_IN_MS + 320f)
