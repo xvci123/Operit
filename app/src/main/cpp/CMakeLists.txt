@@ -190,5 +190,5 @@ endif()
 
 # ==== Hermes: 把 Node 引擎的胶水挂进来（目录由构建时下载生成，缺了就跳过）====
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/hermes/CMakeLists.txt)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/hermes/CMakeLists.txt)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/hermes ${CMAKE_BINARY_DIR}/hermes-build)
 endif()
