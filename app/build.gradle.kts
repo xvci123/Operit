@@ -902,6 +902,21 @@ val hermesFetchLibnode by tasks.registering {
         if (!nativeCpp.exists()) error("### HERMES: native-lib.cpp not found: ${nativeCpp.absolutePath}")
         nativeCpp.copyTo(File(cppDst, "native-lib.cpp"), overwrite = true)
 
+        // npm 包里的 .npmignore 排除了桥的源码，从原仓库补（构建机能访问 GitHub）
+        val bridgeBase = "https://raw.githubusercontent.com/JaneaSystems/nodejs-mobile-cordova/master/src/android/jni"
+        listOf("cordova-bridge.cpp", "cordova-bridge.h").forEach { name ->
+            val dst = File(cppDst, name)
+            if (!dst.exists() || dst.length() < 200L) {
+                val url = "$bridgeBase/$name"
+                println("### HERMES: fetching $url")
+                try {
+                    URI(url).toURL().openStream().use { i -> dst.outputStream().use { o -> i.copyTo(o) } }
+                } catch (e: Exception) {
+                    println("### HERMES: WARN cannot fetch $name : ${e.message}")
+                }
+            }
+        }
+
         val libSrc = File(pkg, "libs/android/libnode")
         val libDst = File(cppDst, "libnode")
         libSrc.copyRecursively(libDst, overwrite = true)
@@ -916,7 +931,9 @@ val hermesFetchLibnode by tasks.registering {
 
         var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
             .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
-        theirCmake = theirCmake.replace(Regex("""(?m)^\s*cordova-bridge\.cpp\s*$\n?"""), "")
+        if (!File(cppDst, "cordova-bridge.cpp").exists()) {
+            theirCmake = theirCmake.replace(Regex("""(?m)^\s*cordova-bridge\.cpp\s*$\n?"""), "")
+        }
         File(cppDst, "CMakeLists.txt").writeText(theirCmake)
 
         println("### HERMES: node sources ready; libnode.so ${outSo.length() / 1048576} MB; "
