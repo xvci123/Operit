@@ -4,16 +4,12 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Find complete bridge sources
+      - name: List react-native android tree (non-headers)
         run: |
           set -x
-          echo "=== 候选 raw 地址逐个试 ==="
-          for U in \
-            "https://raw.githubusercontent.com/JaneaSystems/nodejs-mobile-cordova/main/src/android/jni/cordova-bridge.h" \
-            "https://raw.githubusercontent.com/nodejs-mobile/nodejs-mobile-cordova/master/src/android/jni/cordova-bridge.h" \
-            "https://raw.githubusercontent.com/nodejs-mobile/nodejs-mobile-react-native/master/android/src/main/java/com/janeasystems/rn_nodejs_mobile/RNNodeJsMobileModule.java" ; do
-            echo "$(curl -sIL -o /dev/null -w '%{http_code}' "$U")  $U"
-          done
-          echo "=== react-native 包里有什么 ==="
           URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-react-native/latest | python3 -c "import json,sys;print(json.load(sys.stdin)['dist']['tarball'])")
-          curl -sL "$URL" -o /tmp/m.tgz; tar -tzf /tmp/m.tgz | grep -Ei "\.aar$|\.so$|\.jar$|libnode|jni" | head -25
+          curl -sL "$URL" -o /tmp/m.tgz
+          echo "=== android/ 非头文件 ==="
+          tar -tzf /tmp/m.tgz | grep "^package/android/" | grep -v "libnode/include" | head -40
+          echo "=== 任何 .aar/.so/.jar ==="
+          tar -tzf /tmp/m.tgz | grep -Ei "\.aar$|\.jar$|\.so$" | head -20
