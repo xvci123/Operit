@@ -896,8 +896,19 @@ val hermesFetchLibnode by tasks.registering {
         val pkg = File(unpacked, "package")
         val cppDst = File(projectDir, "src/main/cpp/hermes")
         cppDst.mkdirs()
-        val theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
+        val cppNames = cppDst.listFiles()?.filter { it.extension == "cpp" }?.map { it.name }.orEmpty()
+        println("### HERMES: cpp files = " + cppNames.joinToString(","))
+        var theirCmake = File(pkg, "src/android/CMakeLists.txt").readText()
             .replace("\${CMAKE_SOURCE_DIR}/libnode/", "\${CMAKE_CURRENT_SOURCE_DIR}/libnode/")
+        // 它引用的文件名未必都在包里：按实际存在的 cpp 修，缺哪个就把那行换掉/删掉
+        listOf("native-lib.cpp", "cordova-bridge.cpp").forEach { referenced ->
+            if (referenced !in cppNames) {
+                val alt = cppNames.firstOrNull { it != "native-lib.cpp" }
+                theirCmake =
+                    if (alt != null) theirCmake.replace(referenced, alt)
+                    else theirCmake.replace(Regex("\n\s*" + Regex.escape(referenced)), "")
+            }
+        }
         File(cppDst, "CMakeLists.txt").writeText(theirCmake)
         // 整个 src/android 下所有 cpp/h 平铺到 hermes/（cordova-bridge.cpp 不在 jni/ 里）
         File(pkg, "src/android").walkTopDown()
