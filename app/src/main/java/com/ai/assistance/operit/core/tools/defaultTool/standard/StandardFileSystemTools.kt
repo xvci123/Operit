@@ -4017,7 +4017,7 @@ open class StandardFileSystemTools(protected val context: Context) {
 
             if (operationType == "create") {
                 val errorMsg =
-                    "If you need to rewrite a whole existing file: do NOT use apply_file to overwrite it. Instead, call delete_file first, then write_file."
+                    "If you need to rewrite a whole existing file: do NOT use apply_file to overwrite it. Call write_file instead (it overwrites the whole file directly; no need to delete first). Tool chooser: create_file = new file only; write_file = full overwrite of an existing file; edit_file = change a small part; apply_file = apply a patch/diff."
                 emit(
                     ToolResult(
                         toolName = tool.name,

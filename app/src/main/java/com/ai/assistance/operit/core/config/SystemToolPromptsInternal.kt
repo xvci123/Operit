@@ -1496,7 +1496,7 @@ object SystemToolPromptsInternal {
                         ),
                         ToolPrompt(
                             name = "write_file",
-                            description = "Write content to a file.",
+                            description = "Overwrite a whole file with new content (creates it if missing). Use this when you are rewriting most of the file. Tool chooser: create_file = new file only; write_file = full overwrite; edit_file = change a small part; apply_file = apply a patch/diff. Do NOT delete a file just to rewrite it.",
                             parametersStructured =
                                 listOf(
                                     ToolParameterSchema(
