@@ -906,7 +906,7 @@ val hermesFetchLibnode by tasks.registering {
                 val alt = cppNames.firstOrNull { it != "native-lib.cpp" }
                 theirCmake =
                     if (alt != null) theirCmake.replace(referenced, alt)
-                    else theirCmake.replace(Regex("\n\s*" + Regex.escape(referenced)), "")
+                    else theirCmake.replace(Regex("""\n\s*""" + Regex.escape(referenced)), "")
             }
         }
         File(cppDst, "CMakeLists.txt").writeText(theirCmake)
