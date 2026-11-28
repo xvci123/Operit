@@ -28,6 +28,8 @@ object HermesNodeRuntime {
     private const val BRIDGE_CLASS = "com.janeasystems.rn_nodejs_mobile.RNNodeJsMobileModule"
 
     @Volatile private var started = false
+    /** 桥内部持弱引用指向它，必须留强引用，否则被 GC 后 JNI 崩溃 */
+    @Volatile private var bridgeRef: Any? = null
     @Volatile private var statusText: String = "未启动"
 
     fun status(): String = statusText
@@ -81,6 +83,7 @@ object HermesNodeRuntime {
         val cls = Class.forName(BRIDGE_CLASS)
         fileLog(context, "找到桥类：" + cls.name)
         val bridge = cls.getDeclaredConstructor().newInstance()
+        bridgeRef = bridge
 
         // 1) 工作目录
         runCatching {

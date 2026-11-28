@@ -12,6 +12,11 @@ import java.util.Locale
 /** 只干一件事：试着把 Node 引擎加载并启动起来，把结果写进 Download/probe-node.log。 */
 class ProbeActivity : Activity() {
 
+    companion object {
+        // 桥内部持弱引用指向这个对象：必须留一个强引用，否则被 GC 后 JNI 直接崩
+        @Volatile var keepAlive: Any? = null
+    }
+
     private fun log(line: String) {
         Log.i("PROBE", line)   // 系统日志：一定看得到
         try {
@@ -45,6 +50,7 @@ class ProbeActivity : Activity() {
                 )
                 val cls = Class.forName("com.janeasystems.rn_nodejs_mobile.RNNodeJsMobileModule")
                 val obj = cls.getDeclaredConstructor().newInstance()
+                keepAlive = obj
                 // 先把工作目录告诉它，再启动（主 App 里有那一步，探头之前漏了）
                 runCatching {
                     cls.getMethod("registerNodeDataDirPath", String::class.java)
