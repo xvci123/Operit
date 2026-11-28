@@ -137,6 +137,52 @@ class ProbeActivity : Activity() {
         }
     }
 
+
+    /** 启动 DSHA 的 sdk-minimal 配置，走 JSON-RPC 握手并问一句。 */
+    private fun runDshSession() {
+        try {
+            val libDir = prepareLibs()
+            val exe = File(applicationInfo.nativeLibraryDir, "libnodebin.so")
+            val root = File(filesDir, "dsh")
+            val bin = File(root, "dsh/lib/bin.js")
+            val work = File(filesDir, "workspace").apply { mkdirs() }
+            val home = File(filesDir, "dsh-home").apply { mkdirs() }
+            say("== 启动 DSHA 会话（sdk-minimal）==")
+            val pb = ProcessBuilder(exe.absolutePath, bin.absolutePath, "--profile", "sdk-minimal")
+            pb.directory(root)
+            val env = pb.environment()
+            env["LD_LIBRARY_PATH"] = libDir.absolutePath + ":" + applicationInfo.nativeLibraryDir
+            env["HOME"] = filesDir.absolutePath
+            env["DSH_HOME"] = home.absolutePath
+            env["DEEPSEEK_API_KEY"] = System.getenv("HERMES_KEY") ?: "sk-placeholder"
+            pb.redirectErrorStream(false)
+            val proc = pb.start()
+            val writer = proc.outputStream.bufferedWriter()
+            val reader = proc.inputStream.bufferedReader()
+
+            fun send(line: String) { writer.write(line + "\n"); writer.flush() }
+            send("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"provider":"deepseek","model":"deepseek-chat","cwd":"${work.absolutePath}"}}""")
+
+            val deadline = System.currentTimeMillis() + 30000
+            var gotInit = false
+            while (System.currentTimeMillis() < deadline) {
+                val line = reader.readLine() ?: break
+                if (line.isBlank()) continue
+                say("<< " + line.take(200))
+                if (!gotInit && line.contains("\"id\":1")) {
+                    gotInit = true
+                    say("== 握手成功，发一句话 ==")
+                    send("""{"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"probe-1","content":[{"type":"text","text":"用一句话自我介绍"}]}}""")
+                }
+                if (line.contains("\"id\":2")) { say("== 已投递 prompt ==") }
+            }
+            proc.destroy()
+            say("== 会话演示结束 ==")
+        } catch (e: Throwable) {
+            say("会话异常：" + e.javaClass.simpleName + " / " + e.message)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val lp = LinearLayout.LayoutParams(
@@ -155,7 +201,7 @@ class ProbeActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(layout) })
         say("== probe 启动 ==")
         runNodeExe()
-        Thread { runDsh(listOf("--version")) }.start()
+        Thread { runDsh(listOf("--version")); runDshSession() }.start()
 
         Thread({
             try {
