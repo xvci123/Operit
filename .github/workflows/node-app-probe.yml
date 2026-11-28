@@ -1,0 +1,17 @@
+name: Node App Probe
+on: workflow_dispatch
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Build probe apk only
+        run: |
+          chmod +x gradlew
+          ./gradlew :nodeprobe:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-apk
+          path: nodeprobe/build/outputs/apk/debug/*.apk

@@ -19,6 +19,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "Operit"
 include(":app")
+include(":nodeprobe")
 include(":dragonbones")
 project(":dragonbones").projectDir = file("avator/dragonbones")
 include(":terminal")
