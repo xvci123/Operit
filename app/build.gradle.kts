@@ -963,27 +963,15 @@ val hermesFetchLibnode by tasks.registering {
 }
 
 val hermesPackDsh by tasks.registering {
-    description = "把本机安装的 DSHA 核心包（去界面/Office/浏览器/语音）打包进 assets"
+    description = "从 npm 拉 DSHA 并打核心包进 assets"
     doLast {
-        val src = File("/usr/local/lib/node_modules/@deepseek-ai/dsh")
+        val script = File(projectDir, "src/main/scripts/pack-dsh.sh")
         val out = File(projectDir, "src/main/assets/dsh/dsh-core.zip")
-        out.parentFile.mkdirs()
-        val skip = listOf("dsh-client", "dsh-web-frontend", "libreoffice", "dsh-office-to-pdf",
-                          "dsh-experimental-browser-use", "dsh-experimental-computer-use",
-                          "dsh-experimental-speech")
-        ant.withGroovyBuilder {
-            "zip"("destfile" to out.absolutePath, "level" to 9) {
-                "zipfileset"("dir" to File(src, "lib").absolutePath, "prefix" to "dsh/lib")
-                "zipfileset"("dir" to File(src, "node_modules/@deepseek-ai").absolutePath,
-                             "prefix" to "dsh/node_modules/@deepseek-ai") {
-                    "exclude"("name" to skip.joinToString(","))
-                }
-                listOf("package.json").forEach { f ->
-                    "zipfileset"("file" to File(src, f).absolutePath, "fullpath" to "dsh/$f")
-                }
-            }
+        project.exec {
+            workingDir = File(project.buildDir, "dshpack-run")
+            commandLine("bash", script.absolutePath, out.absolutePath,
+                "0.2.0-rc.2", File(project.buildDir, "dshpack").absolutePath)
         }
-        logger.lifecycle("### HERMES: dsh-core.zip = ${out.length() / 1048576} MB")
     }
 }
 
