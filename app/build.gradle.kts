@@ -938,6 +938,18 @@ val hermesFetchLibnode by tasks.registering {
                 println("### HERMES: WARN cannot fetch emutls.c: ${e.message}")
             }
         }
+        // emutls.c 依赖 compiler-rt 的两个内部头
+        listOf("int_lib.h", "int_types.h").forEach { h ->
+            val dst = File(cppDst, h)
+            if (!dst.exists() || dst.length() < 200L) {
+                val url = "https://raw.githubusercontent.com/llvm/llvm-project/main/compiler-rt/lib/builtins/$h"
+                runCatching {
+                    URI(url).toURL().openStream().use { i -> dst.outputStream().use { o -> i.copyTo(o) } }
+                }.onSuccess { println("### HERMES: $h fetched") }
+                 .onFailure { println("### HERMES: WARN cannot fetch $h: ${it.message}") }
+            }
+        }
+
         if (emutls.exists()) {
             cmake += "\nadd_library(hermes_emutls SHARED emutls.c)\n"
             File(cppDst, "CMakeLists.txt").writeText(cmake)   // 追加后重写一次
