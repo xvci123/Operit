@@ -118,6 +118,8 @@ class OperitApplication : Application(), ImageLoaderFactory, WorkConfiguration.P
     }
 
     override fun onCreate() {
+        // Hermes: 每次进程启动都把 Node 拉起来（内部有幂等闸门，失败只写日志）
+        com.ai.assistance.operit.core.plugins.node.HermesNodeRuntime.startAsync(this)
         super.onCreate()
         val startTime = System.currentTimeMillis()
         appStartupTimeMs = startTime
