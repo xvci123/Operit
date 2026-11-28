@@ -4,13 +4,16 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: List termux node pool dir
+      - name: Download termux node and inspect
         run: |
-          for U in \
-            "https://packages.termux.dev/apt/termux-main/pool/main/n/nodejs/" \
-            "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/" \
-            "https://mirrors.ustc.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/" ; do
-            echo "=== $U"
-            curl -sL --max-time 25 "$U" | grep -oE 'href="[^"]*aarch64\.deb"' | head -8
-            curl -sL --max-time 25 "$U" | grep -oE 'nodejs[^"<> ]*aarch64\.deb' | sort -u | head -8
-          done
+          set -x
+          curl -sL -o /tmp/node.deb "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/nodejs_26.13.1_aarch64.deb"
+          ls -l /tmp/node.deb
+          dpkg-deb -x /tmp/node.deb /tmp/nx
+          find /tmp/nx -type f | head -20
+          BIN=$(find /tmp/nx -path "*bin/node" | head -1)
+          echo "BIN=$BIN"
+          ls -l "$BIN"
+          file "$BIN" || true
+          echo "=== NEEDED 库 ==="
+          readelf -d "$BIN" | grep NEEDED || true
