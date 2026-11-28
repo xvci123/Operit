@@ -43,6 +43,13 @@ class ProbeActivity : Activity() {
                 )
                 val cls = Class.forName("com.janeasystems.rn_nodejs_mobile.RNNodeJsMobileModule")
                 val obj = cls.getDeclaredConstructor().newInstance()
+                // 先把工作目录告诉它，再启动（主 App 里有那一步，探头之前漏了）
+                runCatching {
+                    cls.getMethod("registerNodeDataDirPath", String::class.java)
+                        .invoke(obj, workDir.absolutePath)
+                    log("已注册工作目录：" + workDir.absolutePath)
+                }.onFailure { log("注册工作目录失败：" + it.message) }
+
                 val started = cls.methods.firstOrNull {
                     it.name.startsWith("startNode") &&
                         it.parameterTypes.firstOrNull() == Array<String>::class.java
