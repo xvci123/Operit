@@ -24,10 +24,10 @@ fetch() { # fetch <pool-subdir> <pkg-prefix>
 fetch n/nodejs nodejs
 fetch z/zlib zlib
 fetch c/c-ares c-ares
-fetch s/sqlite sqlite
-fetch s/sqlite libsqlite
-fetch l/libffi libffi
-fetch l/libffi ffi
+fetch libs/libsqlite libsqlite
+
+fetch libf/libffi libffi
+
 
 NODE="$(find "$WORK/x" -path '*bin/node' -type f | head -1)"
 if [ -z "$NODE" ]; then echo "### HERMES: ERROR node binary not found"; exit 1; fi
