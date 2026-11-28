@@ -147,8 +147,9 @@ class ProbeActivity : Activity() {
             val bin = File(root, "dsh/lib/bin.js")
             val work = File(filesDir, "workspace").apply { mkdirs() }
             val home = File(filesDir, "dsh-home").apply { mkdirs() }
-            say("== 启动 DSHA 会话（sdk-minimal）==")
-            val pb = ProcessBuilder(exe.absolutePath, bin.absolutePath, "--profile", "sdk-minimal")
+            ensureProfile()
+            say("== 启动 DSHA 会话（profile=hermes）==")
+            val pb = ProcessBuilder(exe.absolutePath, bin.absolutePath, "--profile", "hermes")
             pb.directory(root)
             val env = pb.environment()
             env["LD_LIBRARY_PATH"] = libDir.absolutePath + ":" + applicationInfo.nativeLibraryDir
@@ -188,6 +189,23 @@ class ProbeActivity : Activity() {
         } catch (e: Throwable) {
             say("会话异常：" + e.javaClass.simpleName + " / " + e.message)
         }
+    }
+
+
+    /** 现场生成一个 dsh profile（sdk-minimal 组合）。 */
+    private fun ensureProfile(): File {
+        val prof = File(File(filesDir, "dsh-home"), "profiles/hermes")
+        prof.mkdirs()
+        File(prof, "package.json").writeText(
+            """{"name":"dsh-profile-hermes","private":true,"dependencies":{},""" +
+            """"dsh":{"profile":{"bundles":["@deepseek-ai/dsh-sdk-minimal"]}}}"""
+        )
+        File(prof, "cordis.yml").writeText("[]\n")
+        File(prof, "cordis.patch.yml").writeText("[]\n")
+        // 让模块解析能看到我们的包目录
+        val nm = File(prof, "node_modules")
+        nm.mkdirs()
+        return prof
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
