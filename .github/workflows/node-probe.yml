@@ -4,12 +4,11 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: List react-native android tree (non-headers)
+      - name: Dump required JNI callbacks
         run: |
-          set -x
           URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-react-native/latest | python3 -c "import json,sys;print(json.load(sys.stdin)['dist']['tarball'])")
-          curl -sL "$URL" -o /tmp/m.tgz
-          echo "=== android/ 非头文件 ==="
-          tar -tzf /tmp/m.tgz | grep "^package/android/" | grep -v "libnode/include" | head -40
-          echo "=== 任何 .aar/.so/.jar ==="
-          tar -tzf /tmp/m.tgz | grep -Ei "\.aar$|\.jar$|\.so$" | head -20
+          curl -sL "$URL" -o /tmp/m.tgz; mkdir -p /tmp/u; tar -xzf /tmp/m.tgz -C /tmp/u
+          echo "=== JNI 导出的 Java 方法（引擎会回调这些）==="
+          grep -rhoE "Java_[A-Za-z0-9_]+" /tmp/u/package/android/src/main/cpp | sort -u
+          echo "=== native-lib.cpp 里的关键调用 ==="
+          grep -nE "GetJavaVM|AttachCurrentThread|CallVoidMethod|GetMethodID|node::Start|StartNode" /tmp/u/package/android/src/main/cpp/*.cpp | head -20
