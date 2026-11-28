@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import com.ai.assistance.operit.core.plugins.node.HermesNodeRuntime
 import com.ai.assistance.operit.util.AppLogger
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -255,7 +256,8 @@ class MainActivity : ComponentActivity() {
 
             try {
                 initializeComponents()
-                hermesComponentsReady = true   // 之后才允许组合主界面
+                HermesNodeRuntime.startAsync(this@MainActivity)
+            hermesComponentsReady = true   // 之后才允许组合主界面
                 anrMonitor.start()
                 configureDisplaySettings()
 
