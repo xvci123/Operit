@@ -940,6 +940,7 @@ val hermesFetchLibnode by tasks.registering {
         }
         if (emutls.exists()) {
             cmake += "\nadd_library(hermes_emutls SHARED emutls.c)\n"
+            File(cppDst, "CMakeLists.txt").writeText(cmake)   // 追加后重写一次
         }
 
         println("### HERMES: node bridge ready; libnode.so ${soDst.length() / 1048576} MB")
