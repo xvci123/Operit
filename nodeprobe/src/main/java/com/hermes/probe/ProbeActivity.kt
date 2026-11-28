@@ -38,6 +38,41 @@ class ProbeActivity : Activity() {
         }
     }
 
+
+    /** 把 assets 里的依赖库复制到私有目录，返回该目录。 */
+    private fun prepareLibs(): File {
+        val dst = File(filesDir, "termux/lib").apply { mkdirs() }
+        val names = assets.list("termux/lib").orEmpty()
+        say("依赖库 ${names.size} 个")
+        names.forEach { n ->
+            val out = File(dst, n)
+            if (!out.exists() || out.length() == 0L) {
+                assets.open("termux/lib/$n").use { i -> out.outputStream().use { o -> i.copyTo(o) } }
+            }
+        }
+        return dst
+    }
+
+    /** 直接执行 Node 二进制，打印版本。 */
+    private fun runNodeExe() {
+        try {
+            val libDir = prepareLibs()
+            val exe = File(applicationInfo.nativeLibraryDir, "libnodebin.so")
+            say("可执行文件：" + exe.absolutePath + " exists=" + exe.exists())
+            val pb = ProcessBuilder(exe.absolutePath, "--version")
+            pb.environment()["LD_LIBRARY_PATH"] = libDir.absolutePath
+            pb.environment()["HOME"] = filesDir.absolutePath
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val outText = proc.inputStream.bufferedReader().readText().trim()
+            val code = proc.waitFor()
+            say("退出码=$code")
+            say("输出=" + outText.take(300))
+        } catch (e: Throwable) {
+            say("执行异常：" + e.javaClass.simpleName + " / " + e.message)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val lp = LinearLayout.LayoutParams(
@@ -55,6 +90,7 @@ class ProbeActivity : Activity() {
         layout.addView(out, lp)
         setContentView(ScrollView(this).apply { addView(layout) })
         say("== probe 启动 ==")
+        runNodeExe()
 
         Thread({
             try {

@@ -30,3 +30,18 @@ android {
 
 // 引擎和源码由主模块那个任务生成，先跑它
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(":app:hermesFetchLibnode") }
+
+// 复用主模块取到的 Node 与依赖库
+val copyNodeForProbe by tasks.registering(Copy::class) {
+    dependsOn(":app:hermesFetchNodeExe")
+    from("../app/src/main/jniLibs/arm64-v8a")
+    into("src/main/jniLibs/arm64-v8a")
+}
+val copyNodeAssetsForProbe by tasks.registering(Copy::class) {
+    dependsOn(":app:hermesFetchNodeExe")
+    from("../app/src/main/assets/termux")
+    into("src/main/assets/termux")
+}
+tasks.matching { it.name == "preBuild" }.configureEach {
+    dependsOn(copyNodeForProbe, copyNodeAssetsForProbe)
+}
