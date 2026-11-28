@@ -24,7 +24,7 @@ fetch() { # fetch <pool-subdir> <pkg-prefix>
 fetch n/nodejs nodejs
 fetch z/zlib zlib
 fetch c/c-ares c-ares
-fetch s/sqlite libsqlite
+fetch s/sqlite sqlite
 fetch l/libffi libffi
 
 NODE="$(find "$WORK/x" -path '*bin/node' -type f | head -1)"

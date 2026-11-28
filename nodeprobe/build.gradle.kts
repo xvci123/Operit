@@ -4,6 +4,13 @@ plugins {
 }
 
 android {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+            keepDebugSymbols += "**/libnodebin.so"
+        }
+    }
+
     namespace = "com.hermes.probe"
     compileSdk = 35
 
