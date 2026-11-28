@@ -939,7 +939,7 @@ val hermesFetchLibnode by tasks.registering {
             }
         }
         // emutls.c 依赖 compiler-rt 的两个内部头
-        listOf("int_lib.h", "int_types.h").forEach { h ->
+        listOf("int_lib.h", "int_types.h", "int_endianness.h", "int_util.h").forEach { h ->
             val dst = File(cppDst, h)
             if (!dst.exists() || dst.length() < 200L) {
                 val url = "https://raw.githubusercontent.com/llvm/llvm-project/main/compiler-rt/lib/builtins/$h"
