@@ -37,7 +37,13 @@ echo "### HERMES: node $(stat -c%s "$JNI_DST/libnodebin.so") bytes"
 
 # 依赖库（保持原名，运行时复制到私有目录再设 LD_LIBRARY_PATH）
 # 注意：libz.so.1 / libcares.so 等是符号链接，必须跟随（-L）复制出真实内容
-find -L "$WORK/x" -path '*usr/lib*' -name 'lib*.so*' \( -type f -o -type l \) 2>/dev/null | while read -r f; do
+echo "### HERMES: usr/lib 内容："
+find -L "$WORK/x" -path '*usr/lib*' -maxdepth 6 2>/dev/null | head -40
+# 放宽：usr/lib 下所有文件都复制（不只看 lib*.so*）
+find -L "$WORK/x" -path '*usr/lib*' -type f 2>/dev/null | while read -r f; do
+  cp -L "$f" "$ASSETS_DST/lib/$(basename "$f")" 2>/dev/null || true
+done
+find -L "$WORK/x" -path '*usr/lib*' -type l 2>/dev/null | while read -r f; do
   cp -L "$f" "$ASSETS_DST/lib/$(basename "$f")" 2>/dev/null || true
 done
 echo "### HERMES: libs -> $(ls "$ASSETS_DST/lib" | tr '\n' ' ')"
