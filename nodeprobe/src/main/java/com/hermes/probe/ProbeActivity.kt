@@ -33,35 +33,18 @@ class ProbeActivity : Activity() {
         log("== probe 启动 ==")
         Thread({
             try {
-                log("加载 emutls shim ...")
-                runCatching { System.loadLibrary("hermes_emutls") }
-                log("加载 c++_shared ...")
+                log("加载 c++_shared / emutls / node / 自己的入口 ...")
                 System.loadLibrary("c++_shared")
-                log("加载 node ...")
+                runCatching { System.loadLibrary("hermes_emutls") }
                 System.loadLibrary("node")
-                log("加载胶水 ...")
-                System.loadLibrary("nodejs-mobile-react-native-native-lib")
-                log("三个库都加载成功")
-
-                val workDir = File(filesDir, "node").apply { mkdirs() }
-                val bootstrap = File(workDir, "bootstrap.js")
-                bootstrap.writeText(
-                    "console.log('### PROBE-NODE alive ' + process.version);\n"
-                )
-                val cls = Class.forName("com.janeasystems.rn_nodejs_mobile.RNNodeJsMobileModule")
-                val obj = cls.getDeclaredConstructor().newInstance()
-                keepAlive = obj
-                // 先把工作目录告诉它，再启动（主 App 里有那一步，探头之前漏了）
-                runCatching {
-                    cls.getMethod("registerNodeDataDirPath", String::class.java)
-                        .invoke(obj, workDir.absolutePath)
-                    log("已注册工作目录：" + workDir.absolutePath)
-                }.onFailure { log("注册工作目录失败：" + it.message) }
-
-                val started = cls.methods.firstOrNull {
-                    it.name.startsWith("startNode") && it.parameterTypes.size == 1
-                }?.invoke(obj, "node " + bootstrap.absolutePath)
-                log("startNode 返回：$started")
+                System.loadLibrary("hermes_node_jni")
+                log("库全部加载成功")
+                val workDir = java.io.File(filesDir, "node").apply { mkdirs() }
+                val bootstrap = java.io.File(workDir, "bootstrap.js")
+                bootstrap.writeText("console.log('### HERMES-NODE alive ' + process.version + ' ' + process.platform);\n")
+                log("脚本：" + bootstrap.absolutePath)
+                val code = com.hermes.node.NodeLauncher.startNative(bootstrap.absolutePath)
+                log("startNative 返回：" + code)
             } catch (e: Throwable) {
                 log("异常：" + e.javaClass.name + " / " + e.message)
                 e.stackTrace.take(6).forEach { log("    at $it") }

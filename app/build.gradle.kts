@@ -952,6 +952,8 @@ val hermesFetchLibnode by tasks.registering {
 
         if (emutls.exists()) {
             cmake += "\nadd_library(hermes_emutls SHARED emutls.c)\n"
+            cmake += "\nadd_library(hermes_node_jni SHARED \${CMAKE_CURRENT_SOURCE_DIR}/../hermes_own/hermes_node_jni.cpp)\n"
+            cmake += "target_link_libraries(hermes_node_jni libnode)\n"
             File(cppDst, "CMakeLists.txt").writeText(cmake)   // 追加后重写一次
         }
 
