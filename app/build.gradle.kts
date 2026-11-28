@@ -962,4 +962,19 @@ val hermesFetchLibnode by tasks.registering {
     }
 }
 
+val hermesFetchNodeExe by tasks.registering {
+    description = "下载 Termux 的 Android 原生 Node(26) 与依赖库"
+    doLast {
+        val script = File(projectDir, "src/main/scripts/fetch-termux-node.sh")
+        project.exec {
+            commandLine(
+                "bash", script.absolutePath,
+                File(projectDir, "src/main/jniLibs/arm64-v8a").absolutePath,
+                File(projectDir, "src/main/assets/termux").absolutePath
+            )
+        }
+    }
+}
+
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(hermesFetchLibnode) }
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(hermesFetchNodeExe) }
