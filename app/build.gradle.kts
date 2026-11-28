@@ -926,6 +926,22 @@ val hermesFetchLibnode by tasks.registering {
             .replace("src/main/jni/", "")
         File(cppDst, "CMakeLists.txt").writeText(cmake)
 
+        // 老工具链的模拟 TLS：libnode.so 需要 __emutls_get_address，现代 NDK 里没有。
+        // 取 LLVM compiler-rt 的 emutls.c 编成小库，加载 libnode 之前先加载它。
+        val emutls = File(cppDst, "emutls.c")
+        if (!emutls.exists() || emutls.length() < 1000L) {
+            val url = "https://raw.githubusercontent.com/llvm/llvm-project/main/compiler-rt/lib/builtins/emutls.c"
+            try {
+                URI(url).toURL().openStream().use { i -> emutls.outputStream().use { o -> i.copyTo(o) } }
+                println("### HERMES: emutls.c fetched (${emutls.length()} B)")
+            } catch (e: Exception) {
+                println("### HERMES: WARN cannot fetch emutls.c: ${e.message}")
+            }
+        }
+        if (emutls.exists()) {
+            cmake += "\nadd_library(hermes_emutls SHARED emutls.c)\n"
+        }
+
         println("### HERMES: node bridge ready; libnode.so ${soDst.length() / 1048576} MB")
         println("### HERMES: cpp = " + cppDst.listFiles()!!.filter { it.extension == "cpp" }.joinToString(",") { it.name })
     }

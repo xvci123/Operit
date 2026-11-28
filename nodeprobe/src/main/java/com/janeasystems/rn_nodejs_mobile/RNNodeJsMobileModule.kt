@@ -1,5 +1,14 @@
 package com.janeasystems.rn_nodejs_mobile
 
+/** 加载顺序：emutls shim → c++_shared → node → 胶水 */
+class EmutlsLoaderShim private constructor() {
+    companion object {
+        fun load() {
+            runCatching { System.loadLibrary("hermes_emutls") }
+        }
+    }
+}
+
 /** 和主 App 里同名的桥入口（JNI 符号要这个包名+类名）。 */
 class RNNodeJsMobileModule {
     external fun startNodeWithArguments(arguments: Array<String>): Int

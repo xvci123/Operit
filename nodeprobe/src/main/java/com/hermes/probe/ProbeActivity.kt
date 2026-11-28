@@ -26,6 +26,8 @@ class ProbeActivity : Activity() {
         log("== probe 启动 ==")
         Thread({
             try {
+                log("加载 emutls shim ...")
+                runCatching { System.loadLibrary("hermes_emutls") }
                 log("加载 c++_shared ...")
                 System.loadLibrary("c++_shared")
                 log("加载 node ...")

@@ -12,6 +12,7 @@ class RNNodeJsMobileModule {
             // 顺序要紧：先把 C++ 运行库拉进来，否则 libnode.so 里的
             // __emutls_get_address 解析不到（UnsatisfiedLinkError）
             runCatching { System.loadLibrary("c++_shared") }
+            runCatching { System.loadLibrary("hermes_emutls") }
             System.loadLibrary("node")
             System.loadLibrary("nodejs-mobile-react-native-lib")
         }
