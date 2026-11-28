@@ -1,8 +1,12 @@
 package com.ai.assistance.operit.core.plugins.node
 
 import android.content.Context
+import android.os.Environment
 import com.ai.assistance.operit.util.AppLogger
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Node 运行时（桥的最后一段：把引擎真正拉起来）。
@@ -28,16 +32,36 @@ object HermesNodeRuntime {
 
     fun status(): String = statusText
 
+    /** 写一行给人看的日志（Download/Operit/hermes-node.log），不靠 logcat 也能查。 */
+    private fun fileLog(context: Context, line: String) {
+        try {
+            val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Operit"
+            )
+            if (!dir.exists()) dir.mkdirs()
+            val f = File(dir, "hermes-node.log")
+            val ts = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
+            f.appendText("$ts  $line\n")
+        } catch (e: Throwable) {
+            AppLogger.w(TAG, "写 hermes-node.log 失败：" + e.message)
+        }
+    }
+
     /** 后台启动；多次调用只生效一次。 */
     fun startAsync(context: Context) {
         if (started) return
         started = true
         val app = context.applicationContext
         Thread({
+                    fileLog(app, "== 开始启动 Node ==")
                     try {
                         startBlocking(app)
+                        fileLog(app, "启动结果：" + statusText)
                     } catch (e: Throwable) {
                         statusText = "启动失败：" + (e.message ?: e.javaClass.simpleName)
+                        fileLog(app, "启动异常：" + e.javaClass.name + " / " + e.message)
+                        e.stackTrace.take(8).forEach { fileLog(app, "    at $it") }
                         AppLogger.e(TAG, "Node 启动失败（已忽略，不影响 App）", e)
                     }
                 }, "hermes-node")
@@ -51,8 +75,11 @@ object HermesNodeRuntime {
         context.assets.open("node/bootstrap.js").use { input ->
             bootstrap.outputStream().use { out -> input.copyTo(out) }
         }
+        fileLog(context, "引导脚本已就位：" + bootstrap.absolutePath + " (" + bootstrap.length() + " B)")
 
+        fileLog(context, "工作目录：" + workDir.absolutePath)
         val cls = Class.forName(BRIDGE_CLASS)
+        fileLog(context, "找到桥类：" + cls.name)
         val bridge = cls.getDeclaredConstructor().newInstance()
 
         // 1) 工作目录
@@ -70,6 +97,7 @@ object HermesNodeRuntime {
                 ?: error("找不到启动方法（桥的接口和预期不一致）")
         val ret = method.invoke(bridge, args)
         statusText = "已启动（返回 " + (ret?.toString() ?: "?") + "）"
+        fileLog(context, "startNode 返回：" + (ret?.toString() ?: "null"))
         AppLogger.i(TAG, "Node 已启动：$statusText，脚本 ${bootstrap.absolutePath}")
     }
 }
