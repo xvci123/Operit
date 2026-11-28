@@ -4,11 +4,17 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Find Termux node binary for aarch64
+      - name: Try termux mirrors for Packages index
         run: |
-          set -x
-          curl -sL https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz -o /tmp/P.xz || true
-          ls -l /tmp/P.xz || true
-          xz -dc /tmp/P.xz > /tmp/P.txt 2>/dev/null || true
-          echo "=== node 相关包 ==="
-          grep -A3 -E "^Package: nodejs" /tmp/P.txt | grep -E "^Package:|^Version:|^Filename:|^Size:" | head -30
+          for U in \
+            "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" \
+            "https://mirror.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" \
+            "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
+            "https://raw.githubusercontent.com/termux/termux-packages/master/packages/nodejs-lts/build.sh" ; do
+            C=$(curl -sIL -o /dev/null -w '%{http_code} %{size_download}' "$U")
+            echo "$C  $U"
+          done
+          echo "=== 试 index ==="
+          curl -sL "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" -o /tmp/P.xz
+          ls -l /tmp/P.xz; xz -dc /tmp/P.xz > /tmp/P.txt 2>/dev/null; wc -l /tmp/P.txt
+          grep -B1 -A6 "^Package: nodejs" /tmp/P.txt | head -40
