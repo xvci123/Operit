@@ -34,8 +34,10 @@ chmod +x "$JNI_DST/libnodebin.so"
 echo "### HERMES: node $(stat -c%s "$JNI_DST/libnodebin.so") bytes"
 
 # 依赖库（保持原名，运行时复制到私有目录再设 LD_LIBRARY_PATH）
-for f in $(find "$WORK/x" -path '*usr/lib*' -name 'lib*.so*' -type f 2>/dev/null); do
-  cp "$f" "$ASSETS_DST/lib/$(basename "$f")"
+# 注意：libz.so.1 / libcares.so 等是符号链接，必须跟随（-L）复制出真实内容
+find -L "$WORK/x" -path '*usr/lib*' -name 'lib*.so*' \( -type f -o -type l \) 2>/dev/null | while read -r f; do
+  cp -L "$f" "$ASSETS_DST/lib/$(basename "$f")" 2>/dev/null || true
 done
+echo "### HERMES: libs -> $(ls "$ASSETS_DST/lib" | tr '\n' ' ')"
 ls -l "$ASSETS_DST/lib" | head -20
 echo "### HERMES: termux node ready"
