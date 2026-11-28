@@ -4,16 +4,10 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Download termux node and inspect
+      - name: List termux pool dirs
         run: |
-          set -x
-          curl -sL -o /tmp/node.deb "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/nodejs_26.13.1_aarch64.deb"
-          ls -l /tmp/node.deb
-          dpkg-deb -x /tmp/node.deb /tmp/nx
-          find /tmp/nx -type f | head -20
-          BIN=$(find /tmp/nx -path "*bin/node" | head -1)
-          echo "BIN=$BIN"
-          ls -l "$BIN"
-          file "$BIN" || true
-          echo "=== NEEDED 库 ==="
-          readelf -d "$BIN" | grep NEEDED || true
+          B="https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main"
+          for d in s l; do
+            echo "=== pool/main/$d （含 sqlite / ffi 的目录）"
+            curl -sL --max-time 25 "$B/$d/" | grep -oE 'href="[^"]*"' | grep -iE 'sqlite|ffi' | head -10
+          done
