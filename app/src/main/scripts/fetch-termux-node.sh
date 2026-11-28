@@ -25,6 +25,7 @@ fetch n/nodejs nodejs
 fetch z/zlib zlib
 fetch c/c-ares c-ares
 fetch s/sqlite sqlite
+fetch s/sqlite libsqlite
 fetch l/libffi libffi
 
 NODE="$(find "$WORK/x" -path '*bin/node' -type f | head -1)"
@@ -39,5 +40,8 @@ find -L "$WORK/x" -path '*usr/lib*' -name 'lib*.so*' \( -type f -o -type l \) 2>
   cp -L "$f" "$ASSETS_DST/lib/$(basename "$f")" 2>/dev/null || true
 done
 echo "### HERMES: libs -> $(ls "$ASSETS_DST/lib" | tr '\n' ' ')"
+for need in libz.so.1 libcares.so libsqlite3.so libffi.so; do
+  if [ ! -f "$ASSETS_DST/lib/$need" ]; then echo "### HERMES: MISSING $need"; fi
+done
 ls -l "$ASSETS_DST/lib" | head -20
 echo "### HERMES: termux node ready"
