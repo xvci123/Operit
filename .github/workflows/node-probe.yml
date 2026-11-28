@@ -4,13 +4,23 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Find sqlite and libffi debs
+      - name: Resolve exact deb filenames from Packages index
         run: |
-          B="https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main"
-          echo "=== s/sqlite/"; curl -sL --max-time 25 "$B/s/sqlite/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head
-          echo "=== libffi/"; curl -sL --max-time 25 "$B/libffi/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head
-          echo "=== 目录里含 sqlite 的其他候选"
-          for d in libs libsqlite; do echo "-- $d"; curl -sL --max-time 20 "$B/$d/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head -3; done
-          echo "=== 直接验 SQLITE/LIBFFI 在哪个包：抓 sqlite deb 看内容"
-          curl -sL -o /tmp/s.deb "$B/s/sqlite/$(curl -sL "$B/s/sqlite/" | grep -oE 'sqlite_[0-9.]+-?[0-9]*_aarch64\.deb' | sort -u | tail -1)"
-          dpkg-deb -c /tmp/s.deb | grep -E "lib.*\.so" | head -5
+          B="https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64"
+          for f in Packages.gz Packages.xz Packages; do
+            code=$(curl -sL -o /tmp/idx -w '%{http_code}' "$B/$f")
+            echo "TRY $f -> $code $(stat -c%s /tmp/idx)"
+            if [ "$code" = "200" ] && [ "$(stat -c%s /tmp/idx)" -gt 50000 ]; then
+              case $f in
+                *.gz) gunzip -c /tmp/idx > /tmp/idx.txt ;;
+                *.xz) xz -dc /tmp/idx > /tmp/idx.txt ;;
+                *) cp /tmp/idx /tmp/idx.txt ;;
+              esac
+              break
+            fi
+          done
+          echo "=== 索引行数: $(wc -l < /tmp/idx.txt 2>/dev/null)"
+          for p in sqlite libsqlite libffi; do
+            echo "--- $p"
+            awk -v pkg="$p" 'BEGIN{RS="";FS="\n"} $0 ~ "^Package: " pkg "$" {for(i=1;i<=NF;i++) if($i ~ /^Package: |^Version: |^Filename: |^Size: /) print $i}' /tmp/idx.txt | head -8
+          done
