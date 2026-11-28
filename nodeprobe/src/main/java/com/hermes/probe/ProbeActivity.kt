@@ -53,9 +53,8 @@ class ProbeActivity : Activity() {
                 }.onFailure { log("注册工作目录失败：" + it.message) }
 
                 val started = cls.methods.firstOrNull {
-                    it.name.startsWith("startNode") &&
-                        it.parameterTypes.firstOrNull() == Array<String>::class.java
-                }?.invoke(obj, arrayOf("node", bootstrap.absolutePath))
+                    it.name.startsWith("startNode") && it.parameterTypes.size == 1
+                }?.invoke(obj, "node " + bootstrap.absolutePath)
                 log("startNode 返回：$started")
             } catch (e: Throwable) {
                 log("异常：" + e.javaClass.name + " / " + e.message)

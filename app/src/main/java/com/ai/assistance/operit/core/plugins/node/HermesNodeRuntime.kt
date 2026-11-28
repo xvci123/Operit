@@ -89,10 +89,10 @@ object HermesNodeRuntime {
         }
 
         // 2) 启动（参数：node 可执行名 + 脚本路径）
-        val args = arrayOf("node", bootstrap.absolutePath)
+        val args = "node " + bootstrap.absolutePath
         val method =
             cls.methods.firstOrNull {
-                it.name.startsWith("startNode") && it.parameterTypes.firstOrNull() == Array<String>::class.java
+                it.name.startsWith("startNode") && it.parameterTypes.size == 1
             }
                 ?: error("找不到启动方法（桥的接口和预期不一致）")
         val ret = method.invoke(bridge, args)

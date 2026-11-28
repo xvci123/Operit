@@ -18,7 +18,7 @@ class RNNodeJsMobileModule {
         }
     }
 
-    external fun startNodeWithArguments(arguments: Array<String>): Int
+    external fun startNodeWithArguments(arguments: String): Int
 
     external fun sendMessageToNodeChannel(channelName: String, msg: String)
 
