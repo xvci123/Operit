@@ -155,7 +155,7 @@ class ProbeActivity : Activity() {
             env["HOME"] = filesDir.absolutePath
             env["DSH_HOME"] = home.absolutePath
             env["DEEPSEEK_API_KEY"] = System.getenv("HERMES_KEY") ?: "sk-placeholder"
-            pb.redirectErrorStream(false)
+            pb.redirectErrorStream(true)
             val proc = pb.start()
             val writer = proc.outputStream.bufferedWriter()
             val reader = proc.inputStream.bufferedReader()
@@ -163,10 +163,16 @@ class ProbeActivity : Activity() {
             fun send(line: String) { writer.write(line + "\n"); writer.flush() }
             send("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"provider":"deepseek","model":"deepseek-chat","cwd":"${work.absolutePath}"}}""")
 
-            val deadline = System.currentTimeMillis() + 30000
+            val deadline = System.currentTimeMillis() + 45000
+            var sawAny = false
             var gotInit = false
             while (System.currentTimeMillis() < deadline) {
-                val line = reader.readLine() ?: break
+                val line = reader.readLine()
+                if (line == null) {
+                    say("stdout 结束，退出码=" + proc.waitFor())
+                    break
+                }
+                sawAny = true
                 if (line.isBlank()) continue
                 say("<< " + line.take(200))
                 if (!gotInit && line.contains("\"id\":1")) {
@@ -176,6 +182,7 @@ class ProbeActivity : Activity() {
                 }
                 if (line.contains("\"id\":2")) { say("== 已投递 prompt ==") }
             }
+            if (!sawAny) say("（没有任何输出）")
             proc.destroy()
             say("== 会话演示结束 ==")
         } catch (e: Throwable) {
