@@ -3,6 +3,7 @@ package com.hermes.probe
 import android.app.Activity
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -12,6 +13,7 @@ import java.util.Locale
 class ProbeActivity : Activity() {
 
     private fun log(line: String) {
+        Log.i("PROBE", line)   // 系统日志：一定看得到
         try {
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Operit")
             if (!dir.exists()) dir.mkdirs()
