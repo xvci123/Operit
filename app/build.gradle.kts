@@ -967,8 +967,9 @@ val hermesPackDsh by tasks.registering {
     doLast {
         val script = File(projectDir, "src/main/scripts/pack-dsh.sh")
         val out = File(projectDir, "src/main/assets/dsh/dsh-core.zip")
+        val wd = File(project.buildDir, "dshpack-run").apply { mkdirs() }
         project.exec {
-            workingDir = File(project.buildDir, "dshpack-run")
+            workingDir = wd
             commandLine("bash", script.absolutePath, out.absolutePath,
                 "0.2.0-rc.2", File(project.buildDir, "dshpack").absolutePath)
         }
