@@ -60,7 +60,7 @@ class ProbeActivity : Activity() {
             val exe = File(applicationInfo.nativeLibraryDir, "libnodebin.so")
             say("可执行文件：" + exe.absolutePath + " exists=" + exe.exists())
             val pb = ProcessBuilder(exe.absolutePath, "--version")
-            pb.environment()["LD_LIBRARY_PATH"] = libDir.absolutePath
+            pb.environment()["LD_LIBRARY_PATH"] = libDir.absolutePath + ":" + applicationInfo.nativeLibraryDir
             pb.environment()["HOME"] = filesDir.absolutePath
             pb.redirectErrorStream(true)
             val proc = pb.start()
