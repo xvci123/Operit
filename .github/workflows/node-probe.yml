@@ -4,19 +4,13 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe mirrors for termux Packages index
+      - name: List termux node pool dir
         run: |
           for U in \
-            "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" \
-            "https://mirrors.ustc.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" \
-            "https://mirror.sjtu.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" \
-            "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz" ; do
-            S=$(curl -sL -o /tmp/t.xz -w '%{http_code} %{size_download}' "$U")
-            echo "TRY $S $U"
-            if [ "$(stat -c%s /tmp/t.xz 2>/dev/null || echo 0)" -gt 100000 ]; then
-              echo "OK using $U"
-              xz -dc /tmp/t.xz > /tmp/P.txt
-              grep -B1 -A6 '^Package: nodejs' /tmp/P.txt | head -24
-              break
-            fi
+            "https://packages.termux.dev/apt/termux-main/pool/main/n/nodejs/" \
+            "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/" \
+            "https://mirrors.ustc.edu.cn/termux/apt/termux-main/pool/main/n/nodejs/" ; do
+            echo "=== $U"
+            curl -sL --max-time 25 "$U" | grep -oE 'href="[^"]*aarch64\.deb"' | head -8
+            curl -sL --max-time 25 "$U" | grep -oE 'nodejs[^"<> ]*aarch64\.deb' | sort -u | head -8
           done
