@@ -1,28 +1,38 @@
 package com.hermes.probe
 
 import android.app.Activity
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Environment
 import android.util.Log
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** 只干一件事：试着把 Node 引擎加载并启动起来，把结果写进 Download/probe-node.log。 */
+/** 把每一步直接显示在屏幕上（不依赖日志系统）。 */
 class ProbeActivity : Activity() {
 
+    private lateinit var out: TextView
+    private val lines = StringBuilder()
+
     companion object {
-        // 桥内部持弱引用指向这个对象：必须留一个强引用，否则被 GC 后 JNI 直接崩
         @Volatile var keepAlive: Any? = null
     }
 
-    private fun log(line: String) {
-        Log.i("PROBE", line)   // 系统日志：一定看得到
+    private fun say(line: String) {
+        Log.i("PROBE", line)
+        val ts = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+        runOnUiThread {
+            lines.append(ts).append("  ").append(line).append('\n')
+            out.text = lines.toString()
+        }
         try {
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Operit")
             if (!dir.exists()) dir.mkdirs()
-            val ts = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US).format(Date())
             File(dir, "probe-node.log").appendText("$ts  $line\n")
         } catch (_: Throwable) {
         }
@@ -30,24 +40,44 @@ class ProbeActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        log("== probe 启动 ==")
+        val lp = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.MATCH_PARENT
+        )
+        val layout = LinearLayout(this)
+        layout.orientation = LinearLayout.VERTICAL
+        layout.setBackgroundColor(Color.parseColor("#0D0E10"))
+        layout.setPadding(28, 70, 28, 28)
+        out = TextView(this)
+        out.setTextColor(Color.parseColor("#E8EAED"))
+        out.textSize = 13f
+        out.setTextIsSelectable(true)
+        layout.addView(out, lp)
+        setContentView(ScrollView(this).apply { addView(layout) })
+        say("== probe 启动 ==")
+
         Thread({
             try {
-                log("加载 c++_shared / emutls / node / 自己的入口 ...")
+                say("加载 c++_shared ...")
                 System.loadLibrary("c++_shared")
+                say("加载 emutls ...")
                 runCatching { System.loadLibrary("hermes_emutls") }
+                say("加载 node ...")
                 System.loadLibrary("node")
+                say("加载自己的入口 ...")
                 System.loadLibrary("hermes_node_jni")
-                log("库全部加载成功")
-                val workDir = java.io.File(filesDir, "node").apply { mkdirs() }
-                val bootstrap = java.io.File(workDir, "bootstrap.js")
-                bootstrap.writeText("console.log('### HERMES-NODE alive ' + process.version + ' ' + process.platform);\n")
-                log("脚本：" + bootstrap.absolutePath)
+                say("四个库都加载成功")
+
+                val workDir = File(filesDir, "node").apply { mkdirs() }
+                val bootstrap = File(workDir, "bootstrap.js")
+                bootstrap.writeText("console.log('### HERMES-NODE alive ' + process.version);\n")
+                say("脚本：" + bootstrap.absolutePath)
+                say("调用 node::Start（会一直跑，直到退出）...")
                 val code = com.hermes.node.NodeLauncher.startNative(bootstrap.absolutePath)
-                log("startNative 返回：" + code)
+                say("startNative 返回：" + code)
             } catch (e: Throwable) {
-                log("异常：" + e.javaClass.name + " / " + e.message)
-                e.stackTrace.take(6).forEach { log("    at $it") }
+                say("异常：" + e.javaClass.name + " / " + e.message)
+                e.stackTrace.take(5).forEach { say("   " + it.toString()) }
             }
         }, "probe").start()
     }
