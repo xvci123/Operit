@@ -27,6 +27,8 @@ fetch c/c-ares c-ares
 fetch libs/libsqlite libsqlite
 
 fetch libf/libffi libffi
+fetch o/openssl openssl
+fetch l/libandroid-support libandroid-support
 
 
 NODE="$(find "$WORK/x" -path '*bin/node' -type f | head -1)"
