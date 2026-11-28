@@ -4,11 +4,11 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Dump native-lib.cpp and node::Start signature
+      - name: Find Termux node binary for aarch64
         run: |
-          URL=$(curl -s https://registry.npmjs.org/nodejs-mobile-react-native/latest | python3 -c "import json,sys;print(json.load(sys.stdin)['dist']['tarball'])")
-          curl -sL "$URL" -o /tmp/m.tgz; mkdir -p /tmp/u; tar -xzf /tmp/m.tgz -C /tmp/u
-          echo "=== native-lib.cpp 全文 ==="
-          cat /tmp/u/package/android/src/main/cpp/native-lib.cpp
-          echo "=== node.h 里的 Start / platform 声明 ==="
-          grep -nE "Start\(|MultiIsolatePlatform|InitializeOncePerProcess|node::Start" /tmp/u/package/android/libnode/include/node/node.h | head -12
+          set -x
+          curl -sL https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages.xz -o /tmp/P.xz || true
+          ls -l /tmp/P.xz || true
+          xz -dc /tmp/P.xz > /tmp/P.txt 2>/dev/null || true
+          echo "=== node 相关包 ==="
+          grep -A3 -E "^Package: nodejs" /tmp/P.txt | grep -E "^Package:|^Version:|^Filename:|^Size:" | head -30
