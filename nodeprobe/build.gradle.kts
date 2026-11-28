@@ -44,11 +44,16 @@ val copyNodeForProbe by tasks.registering(Copy::class) {
     from("../app/src/main/jniLibs/arm64-v8a")
     into("src/main/jniLibs/arm64-v8a")
 }
+val copyDshForProbe by tasks.registering(Copy::class) {
+    dependsOn(":app:hermesPackDsh")
+    from("../app/src/main/assets/dsh")
+    into("src/main/assets/dsh")
+}
 val copyNodeAssetsForProbe by tasks.registering(Copy::class) {
     dependsOn(":app:hermesFetchNodeExe")
     from("../app/src/main/assets/termux")
     into("src/main/assets/termux")
 }
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(copyNodeForProbe, copyNodeAssetsForProbe)
+    dependsOn(copyNodeForProbe, copyNodeAssetsForProbe, copyDshForProbe)
 }

@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import java.io.File
+import java.util.zip.ZipInputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -80,6 +81,62 @@ class ProbeActivity : Activity() {
         }
     }
 
+
+    /** 解开 assets 里的 DSHA 核心包（只解一次）。 */
+    private fun unzipDsh(): File {
+        val dst = File(filesDir, "dsh")
+        val marker = File(dst, "dsh/lib/bin.js")
+        if (marker.exists()) { say("DSHA 已解开（跳过）"); return dst }
+        say("解压 DSHA 核心包 ...")
+        val t0 = System.currentTimeMillis()
+        ZipInputStream(assets.open("dsh/dsh-core.zip")).use { zis ->
+            var e = zis.nextEntry
+            while (e != null) {
+                val out = File(dst, e.name)
+                if (e.isDirectory) out.mkdirs() else {
+                    out.parentFile?.mkdirs()
+                    out.outputStream().use { o -> zis.copyTo(o) }
+                }
+                zis.closeEntry()
+                e = zis.nextEntry
+            }
+        }
+        say("解压耗时 " + ((System.currentTimeMillis() - t0) / 1000) + " 秒，bin.js=" + marker.exists())
+        return dst
+    }
+
+    /** 用 Node 26 跑 DSHA 的入口（先只看版本/帮助）。 */
+    private fun runDsh(args: List<String>) {
+        try {
+            val libDir = prepareLibs()
+            val exe = File(applicationInfo.nativeLibraryDir, "libnodebin.so")
+            val root = unzipDsh()
+            val bin = File(root, "dsh/lib/bin.js")
+            val cmd = mutableListOf(exe.absolutePath, bin.absolutePath)
+            cmd.addAll(args)
+            say("执行：" + args.joinToString(" "))
+            val pb = ProcessBuilder(cmd)
+            pb.directory(root)
+            pb.environment()["LD_LIBRARY_PATH"] = libDir.absolutePath + ":" + applicationInfo.nativeLibraryDir
+            pb.environment()["HOME"] = filesDir.absolutePath
+            pb.environment()["DSH_HOME"] = File(filesDir, "dsh-home").absolutePath
+            pb.redirectErrorStream(true)
+            val proc = pb.start()
+            val outText = proc.inputStream.bufferedReader().readText()
+            val code = proc.waitFor()
+            say("DSH 退出码=" + code)
+            outText.split("\n").take(60).forEach { line ->
+                var i = 0
+                while (i < line.length) {
+                    val end = minOf(i + 40, line.length)
+                    say("  " + line.substring(i, end)); i = end
+                }
+            }
+        } catch (e: Throwable) {
+            say("DSH 执行异常：" + e.javaClass.simpleName + " / " + e.message)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val lp = LinearLayout.LayoutParams(
@@ -98,6 +155,7 @@ class ProbeActivity : Activity() {
         setContentView(ScrollView(this).apply { addView(layout) })
         say("== probe 启动 ==")
         runNodeExe()
+        Thread { runDsh(listOf("--version")) }.start()
 
         Thread({
             try {
