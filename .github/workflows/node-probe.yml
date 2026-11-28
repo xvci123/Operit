@@ -4,10 +4,13 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: List termux pool dirs
+      - name: Find sqlite and libffi debs
         run: |
           B="https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/pool/main"
-          for d in s l; do
-            echo "=== pool/main/$d （含 sqlite / ffi 的目录）"
-            curl -sL --max-time 25 "$B/$d/" | grep -oE 'href="[^"]*"' | grep -iE 'sqlite|ffi' | head -10
-          done
+          echo "=== s/sqlite/"; curl -sL --max-time 25 "$B/s/sqlite/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head
+          echo "=== libffi/"; curl -sL --max-time 25 "$B/libffi/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head
+          echo "=== 目录里含 sqlite 的其他候选"
+          for d in libs libsqlite; do echo "-- $d"; curl -sL --max-time 20 "$B/$d/" | grep -oE '[a-z0-9.+-]*_aarch64\.deb' | sort -u | head -3; done
+          echo "=== 直接验 SQLITE/LIBFFI 在哪个包：抓 sqlite deb 看内容"
+          curl -sL -o /tmp/s.deb "$B/s/sqlite/$(curl -sL "$B/s/sqlite/" | grep -oE 'sqlite_[0-9.]+-?[0-9]*_aarch64\.deb' | sort -u | tail -1)"
+          dpkg-deb -c /tmp/s.deb | grep -E "lib.*\.so" | head -5
