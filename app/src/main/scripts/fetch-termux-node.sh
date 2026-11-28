@@ -27,6 +27,7 @@ fetch c/c-ares c-ares
 fetch s/sqlite sqlite
 fetch s/sqlite libsqlite
 fetch l/libffi libffi
+fetch l/libffi ffi
 
 NODE="$(find "$WORK/x" -path '*bin/node' -type f | head -1)"
 if [ -z "$NODE" ]; then echo "### HERMES: ERROR node binary not found"; exit 1; fi
@@ -40,8 +41,18 @@ find -L "$WORK/x" -path '*usr/lib*' -name 'lib*.so*' \( -type f -o -type l \) 2>
   cp -L "$f" "$ASSETS_DST/lib/$(basename "$f")" 2>/dev/null || true
 done
 echo "### HERMES: libs -> $(ls "$ASSETS_DST/lib" | tr '\n' ' ')"
+# 包里可能只有带版本号的文件（libsqlite3.so.0.8.6 / libffi.so.8.x），
+# 按前缀找已复制的候选，再按“需要的名字”放一份
 for need in libz.so.1 libcares.so libsqlite3.so libffi.so; do
-  if [ ! -f "$ASSETS_DST/lib/$need" ]; then echo "### HERMES: MISSING $need"; fi
+  if [ ! -f "$ASSETS_DST/lib/$need" ]; then
+    cand=$(ls "$ASSETS_DST/lib" 2>/dev/null | grep "^${need}" | head -1)
+    if [ -n "$cand" ]; then
+      cp -L "$ASSETS_DST/lib/$cand" "$ASSETS_DST/lib/$need"
+      echo "### HERMES: $need <- $cand"
+    else
+      echo "### HERMES: MISSING $need (candidates: $(ls "$ASSETS_DST/lib" | tr '\n' ' '))"
+    fi
+  fi
 done
 ls -l "$ASSETS_DST/lib" | head -20
 echo "### HERMES: termux node ready"
