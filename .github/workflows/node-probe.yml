@@ -4,23 +4,11 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve exact deb filenames from Packages index
+      - name: grep index for sqlite/ffi packages
         run: |
-          B="https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64"
-          for f in Packages.gz Packages.xz Packages; do
-            code=$(curl -sL -o /tmp/idx -w '%{http_code}' "$B/$f")
-            echo "TRY $f -> $code $(stat -c%s /tmp/idx)"
-            if [ "$code" = "200" ] && [ "$(stat -c%s /tmp/idx)" -gt 50000 ]; then
-              case $f in
-                *.gz) gunzip -c /tmp/idx > /tmp/idx.txt ;;
-                *.xz) xz -dc /tmp/idx > /tmp/idx.txt ;;
-                *) cp /tmp/idx /tmp/idx.txt ;;
-              esac
-              break
-            fi
-          done
-          echo "=== 索引行数: $(wc -l < /tmp/idx.txt 2>/dev/null)"
-          for p in sqlite libsqlite libffi; do
-            echo "--- $p"
-            awk -v pkg="$p" 'BEGIN{RS="";FS="\n"} $0 ~ "^Package: " pkg "$" {for(i=1;i<=NF;i++) if($i ~ /^Package: |^Version: |^Filename: |^Size: /) print $i}' /tmp/idx.txt | head -8
-          done
+          curl -sL -o /tmp/idx.gz "https://mirrors.tuna.tsinghua.edu.cn/termux/apt/termux-main/dists/stable/main/binary-aarch64/Packages.gz"
+          gunzip -c /tmp/idx.gz > /tmp/idx.txt
+          echo "=== 含 sqlite 的包名"; grep -a "^Package: .*sqlite" /tmp/idx.txt | sort -u
+          echo "=== 含 ffi 的包名"; grep -a "^Package: .*ffi" /tmp/idx.txt | sort -u
+          echo "=== libffi 的 Filename"; grep -a -A12 "^Package: libffi$" /tmp/idx.txt | grep -aE "^Package|^Version|^Filename|^Size" | head -6
+          echo "=== libsqlite 的 Filename"; grep -a -A12 "^Package: libsqlite$" /tmp/idx.txt | grep -aE "^Package|^Version|^Filename|^Size" | head -6
