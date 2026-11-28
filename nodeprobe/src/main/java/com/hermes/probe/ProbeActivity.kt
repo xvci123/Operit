@@ -67,7 +67,14 @@ class ProbeActivity : Activity() {
             val outText = proc.inputStream.bufferedReader().readText().trim()
             val code = proc.waitFor()
             say("退出码=$code")
-            say("输出=" + outText.take(300))
+            outText.split("\n").forEach { line ->
+                var i = 0
+                while (i < line.length) {
+                    val end = minOf(i + 40, line.length)
+                    say("  " + line.substring(i, end))
+                    i = end
+                }
+            }
         } catch (e: Throwable) {
             say("执行异常：" + e.javaClass.simpleName + " / " + e.message)
         }

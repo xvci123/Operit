@@ -29,6 +29,7 @@ fetch libs/libsqlite libsqlite
 fetch libf/libffi libffi
 fetch o/openssl openssl
 fetch libi/libicu libicu
+fetch libc/libc++ libc++
 fetch l/libandroid-support libandroid-support
 
 
